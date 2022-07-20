@@ -21,7 +21,9 @@ apps:
     command: bin/tailscaled --statedir $SNAP_DATA
     daemon: simple
     plugs:
+      - firewall-control
       - network
+      - network-bind
       - network-control
 
 parts:
