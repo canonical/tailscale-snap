@@ -1,0 +1,34 @@
+name: tailscale
+base: core20
+version: 1.22.1
+grade: stable
+confinement: devmode
+summary: The easiest, most secure way to use WireGuard and 2FA
+description: |
+  A secure network that just works Zero config VPN.
+
+  Installs on any device in minutes, manages firewall rules for you, and works
+  from anywhere.
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+  - build-on: armhf
+
+apps:
+  tailscale:
+    command: bin/tailscale
+  tailscaled:
+    command: bin/tailscaled --statedir $SNAP_DATA
+    daemon: simple
+    plugs:
+      - network
+      - network-control
+
+parts:
+  tailscale:
+    source: https://github.com/tailscale/tailscale.git
+    source-tag: v$SNAPCRAFT_PROJECT_VERSION
+    plugin: go
+    override-build: |
+      sed -i paths/paths.go -e 's|"/var/run/tailscale/tailscaled.sock"|filepath.Join(os.Getenv("SNAP_DATA"), "tailscaled.sock")|'
+      snapcraftctl build
