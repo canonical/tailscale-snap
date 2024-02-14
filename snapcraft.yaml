@@ -1,8 +1,8 @@
 name: tailscale
-base: core20
-version: 1.22.1
+base: core22
+version: 1.58.2
 grade: stable
-confinement: devmode
+confinement: strict
 summary: The easiest, most secure way to use WireGuard and 2FA
 description: |
   A secure network that just works Zero config VPN.
@@ -11,26 +11,50 @@ description: |
   from anywhere.
 architectures:
   - build-on: amd64
-  - build-on: arm64
-  - build-on: armhf
+    #  - build-on: arm64
+    #  - build-on: armhf
+
+plugs:
+  sys-devices-virtual-info:
+    interface: system-files
+    read:
+    - /sys/devices/virtual/dmi/id/bios_vendor
+    - /sys/devices/virtual/dmi/id/product_name
 
 apps:
   tailscale:
     command: bin/tailscale
+    plugs:
+      - network
+      - network-observe
   tailscaled:
-    command: bin/tailscaled --statedir $SNAP_DATA
+    command: bin/tailscaled --statedir $SNAP_DATA --verbose 10
     daemon: simple
     plugs:
       - firewall-control
       - network
       - network-bind
+      - network-manager
       - network-control
+      - network-observe
+      - sys-devices-virtual-info
+      - system-observe
 
 parts:
   tailscale:
     source: https://github.com/tailscale/tailscale.git
     source-tag: v$SNAPCRAFT_PROJECT_VERSION
     plugin: go
+    build-snaps:
+      - go
+    stage-packages:
+      - iptables
+      - openssh-client # for tailscale ssh
     override-build: |
       sed -i paths/paths.go -e 's|"/var/run/tailscale/tailscaled.sock"|filepath.Join(os.Getenv("SNAP_DATA"), "tailscaled.sock")|'
-      snapcraftctl build
+      go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscale
+      go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscaled
+    override-prime: |
+      craftctl default
+      ln -s xtables-nft-multi $CRAFT_PRIME/usr/sbin/iptables
+      ln -s xtables-nft-multi $CRAFT_PRIME/usr/sbin/ip6tables
