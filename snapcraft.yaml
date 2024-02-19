@@ -11,13 +11,14 @@ description: |
   from anywhere.
 architectures:
   - build-on: amd64
-    #  - build-on: arm64
-    #  - build-on: armhf
+  - build-on: arm64
+  - build-on: armhf
 
 plugs:
   sys-devices-virtual-info:
     interface: system-files
     read:
+    # tailscale uses this to figure out if running in VM and if so, which Public Cloud
     - /sys/devices/virtual/dmi/id/bios_vendor
     - /sys/devices/virtual/dmi/id/product_name
 
