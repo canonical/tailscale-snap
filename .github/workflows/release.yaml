@@ -1,0 +1,34 @@
+name: Publish snap
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  check:
+    uses: ./.github/workflows/check.yaml
+    secrets: inherit
+
+  release:
+    runs-on: ubuntu-latest
+    needs: check
+    outputs:
+      snap: ${{ steps.build.outputs.snap }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Complete git history is required to generate the version from git tags.
+      - uses: snapcore/action-build@v1
+        id: build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap
+          path: ${{ steps.build.outputs.snap }}
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_LOGIN }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: latest/edge

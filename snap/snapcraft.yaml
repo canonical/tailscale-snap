@@ -1,6 +1,7 @@
 name: tailscale
 base: core22
 version: 1.58.2
+license: BSD-3-Clause
 grade: stable
 confinement: strict
 summary: The easiest, most secure way to use WireGuard and 2FA
@@ -18,9 +19,9 @@ plugs:
   sys-devices-virtual-info:
     interface: system-files
     read:
-    # tailscale uses this to figure out if running in VM and if so, which Public Cloud
-    - /sys/devices/virtual/dmi/id/bios_vendor
-    - /sys/devices/virtual/dmi/id/product_name
+      # tailscale uses this to figure out if running in VM and if so, which Public Cloud
+      - /sys/devices/virtual/dmi/id/bios_vendor
+      - /sys/devices/virtual/dmi/id/product_name
 
 apps:
   tailscale:
@@ -50,7 +51,7 @@ parts:
       - go
     stage-packages:
       - iptables
-      - openssh-client # for tailscale ssh
+      - openssh-client  # for tailscale ssh
     override-build: |
       sed -i paths/paths.go -e 's|"/var/run/tailscale/tailscaled.sock"|filepath.Join(os.Getenv("SNAP_DATA"), "tailscaled.sock")|'
       go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscale

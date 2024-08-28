@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "**.rst"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Complete git history is required to generate the version from git tags.
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y yamllint
+
+      - name: Lint yaml files
+        run: |
+          yamllint .yamllint snap/snapcraft.yaml
+
+      - name: Verify snap builds successfully
+        uses: snapcore/action-build@v1
