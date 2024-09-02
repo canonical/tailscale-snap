@@ -1,0 +1,47 @@
+# This file is centrally managed as a template file in https://github.com/canonical/solutions-engineering-automation
+# To update the file:
+# - Edit it in the canonical/solutions-engineering-automation repository.
+# - Open a PR with the changes.
+# - When the PR merges, the soleng-terraform bot will open a PR to the target repositories with the changes.
+name: Tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "**.rst"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Complete git history is required to generate the version from git tags.
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y yamllint
+
+      - name: Lint yaml files
+        run: |
+          yamllint .yamllint snap/snapcraft.yaml
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Complete git history is required to generate the version from git tags.
+
+      - name: Verify snap builds successfully
+        uses: snapcore/action-build@v1
