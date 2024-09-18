@@ -17,8 +17,12 @@ jobs:
     secrets: inherit
 
   release:
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runs-on }}
     needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [[ubuntu-22.04]]
     outputs:
       snap: ${{ steps.build.outputs.snap }}
     steps:
@@ -27,9 +31,11 @@ jobs:
           fetch-depth: 0  # Complete git history is required to generate the version from git tags.
       - uses: snapcore/action-build@v1
         id: build
+      - name: Determine system architecture
+        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
       - uses: actions/upload-artifact@v4
         with:
-          name: snap
+          name: snap_${{ env.SYSTEM_ARCH }}
           path: ${{ steps.build.outputs.snap }}
       - uses: snapcore/action-publish@v1
         env:
