@@ -37,6 +37,8 @@ jobs:
           yamllint .yamllint snap/snapcraft.yaml
 
   build:
+    needs:
+      - lint
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -63,7 +65,7 @@ jobs:
   func:
     needs:
       - build
-    runs-on:  ${{ matrix.runs-on }}
+    runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
       matrix:
