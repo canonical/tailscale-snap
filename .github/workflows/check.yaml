@@ -27,10 +27,22 @@ jobs:
         with:
           fetch-depth: 0  # Complete git history is required to generate the version from git tags.
 
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y yamllint
+          python -m pip install --upgrade pip
+          # pin tox to the current major version to avoid
+          # workflows breaking all at once when a new major version is released.
+          python -m pip install 'tox<5'
+
+      - name: Run linters
+        run: tox -e lint
 
       - name: Lint yaml files
         run: |
