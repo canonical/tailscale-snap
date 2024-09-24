@@ -63,7 +63,7 @@ jobs:
 
       - name: Verify snap builds successfully
         id: build
-        uses: snapcore/action-build@v1
+        uses: canonical/action-build@v1
 
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
