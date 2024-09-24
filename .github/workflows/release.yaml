@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Complete git history is required to generate the version from git tags.
-      - uses: snapcore/action-build@v1
+      - uses: canonical/action-build@v1
         id: build
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
