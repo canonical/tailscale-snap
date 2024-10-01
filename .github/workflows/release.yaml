@@ -23,23 +23,25 @@ jobs:
       fail-fast: false
       matrix:
         runs-on: [[ubuntu-22.04]]
-    outputs:
-      snap: ${{ steps.build.outputs.snap }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Complete git history is required to generate the version from git tags.
-      - uses: canonical/action-build@v1
-        id: build
+
       - name: Determine system architecture
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
-      - uses: actions/upload-artifact@v4
+
+      - name: Download the built snap from check workflow
+        uses: actions/download-artifact@v4
         with:
           name: snap_${{ env.SYSTEM_ARCH }}
-          path: ${{ steps.build.outputs.snap }}
+
+      - name: Find the downloaded snap file
+        run: echo "SNAP_FILE=$(find . -name "*.snap")" >> $GITHUB_ENV
+
       - uses: snapcore/action-publish@v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_LOGIN }}
         with:
-          snap: ${{ steps.build.outputs.snap }}
+          snap: ${{ env.SNAP_FILE }}
           release: latest/edge
