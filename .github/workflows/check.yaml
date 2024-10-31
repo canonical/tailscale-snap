@@ -87,14 +87,6 @@ jobs:
         with:
           fetch-depth: 0  # Complete git history is required to generate the version from git tags.
 
-      - name: Determine system architecture
-        run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
-
-      - name: Download the built snap
-        uses: actions/download-artifact@v4
-        with:
-          name: snap_${{ env.SYSTEM_ARCH }}
-
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
@@ -104,6 +96,20 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install 'tox<5'
+
+      - name: Determine system architecture
+        run: echo "SYSTEM_ARCH=$$(uname -m)" >> $GITHUB_ENV
+
+      - name: Download snap file artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: snap_${{ env.SYSTEM_ARCH }}
+
+      - name: Run func tests
+        run: |
+          export TEST_SNAP="$$(pwd)/$(ls | grep '.*_.*\.snap$$')"
+          echo "$TEST_SNAP"
+          tox -e func
 
       - name: Run functional tests
         run: tox -e func
