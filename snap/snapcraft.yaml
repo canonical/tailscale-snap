@@ -1,6 +1,6 @@
 name: tailscale
-base: core22
-version: 1.58.2
+base: core24
+version: 1.76.6
 license: BSD-3-Clause
 grade: stable
 confinement: strict
@@ -19,13 +19,14 @@ description: |
   - `ssh` over the tailscale network will not work if tailscale ssh mode is enabled (ie. if you have configured `tailscale set --ssh`). To fix this, disable tailscale ssh: `tailscale set --ssh=false`.
   - `tailscale update` will not work: to update tailscale, please refresh the snap.
   - `tailscale file cp` and `tailscale cert` will only work with file paths accessible to the snap, for example `/home/ubuntu/snap/tailscale/common/foo.txt`. See snap [data locations](https://snapcraft.io/docs/data-locations) for a full list.
+  - `tailscale drive share` will not work (the client command succeeds, the share is registered, but you will see errors in tailscaled logs and the share will not be accessible).
 
   If any malfunction with Tailscale features is observed, where this issue is not observed in Tailscale installed from a source other than the snap, please [open an issue](https://github.com/canonical/tailscale-snap/issues).
 
-architectures:
-  - build-on: amd64
-  - build-on: arm64
-  - build-on: armhf
+platforms:
+  amd64:
+  arm64:
+  armhf:
 
 plugs:
   sys-devices-virtual-info:
@@ -68,6 +69,7 @@ parts:
       - iptables
       - openssh-client  # for tailscale ssh
     override-build: |
+      # Tailscaled socket path is hardcoded, so it must be patched here to work in the snap environment.
       sed -i paths/paths.go -e 's|"/var/run/tailscale/tailscaled.sock"|filepath.Join(os.Getenv("SNAP_DATA"), "tailscaled.sock")|'
       go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscale
       go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscaled
