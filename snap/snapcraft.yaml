@@ -10,6 +10,18 @@ description: |
 
   Installs on any device in minutes, manages firewall rules for you, and works
   from anywhere.
+
+  ## Confinement
+
+  The snap is strictly confined, and this currently brings some limitations.
+
+  - `tailscale ssh` will not work.
+  - `ssh` over the tailscale network will not work if tailscale ssh mode is enabled (ie. if you have configured `tailscale set --ssh`). To fix this, disable tailscale ssh: `tailscale set --ssh=false`.
+  - `tailscale update` will not work: to update tailscale, please refresh the snap.
+  - `tailscale file cp` and `tailscale cert` will only work with file paths accessible to the snap, for example `/home/ubuntu/snap/tailscale/common/foo.txt`. See snap [data locations](https://snapcraft.io/docs/data-locations) for a full list.
+
+  If any malfunction with Tailscale features is observed, where this issue is not observed in Tailscale installed from a source other than the snap, please [open an issue](https://github.com/canonical/tailscale-snap/issues).
+
 architectures:
   - build-on: amd64
   - build-on: arm64
@@ -20,15 +32,21 @@ plugs:
     interface: system-files
     read:
       # tailscale uses this to figure out if running in VM and if so, which Public Cloud
+      # https://github.com/tailscale/tailscale/blob/65fe0ba7b50928eff53e2750ff2d583e4a33eb7e/util/cloudenv/cloudenv.go#L115-L126
+      - /sys/class/dmi/id/bios_vendor
+      - /sys/class/dmi/id/sys_vendor
+      - /sys/class/dmi/id/product_name
+      # the above paths appear to be symlinks to the below
       - /sys/devices/virtual/dmi/id/bios_vendor
       - /sys/devices/virtual/dmi/id/product_name
+      - /sys/devices/virtual/dmi/id/sys_vendor
 
 apps:
   tailscale:
     command: bin/tailscale
     plugs:
       - network
-      - network-observe
+      - network-bind
   tailscaled:
     command: bin/tailscaled --statedir $SNAP_DATA --verbose 10
     daemon: simple
@@ -36,11 +54,8 @@ apps:
       - firewall-control
       - network
       - network-bind
-      - network-manager
       - network-control
-      - network-observe
       - sys-devices-virtual-info
-      - system-observe
 
 parts:
   tailscale:
