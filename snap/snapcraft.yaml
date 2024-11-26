@@ -29,15 +29,13 @@ platforms:
   armhf:
 
 plugs:
-  sys-devices-virtual-info:
+  sys-devices-virtual-dmi-ids:
     interface: system-files
     read:
-      # tailscale uses this to figure out if running in VM and if so, which Public Cloud
+      # Tailscale uses this to figure out if running in VM and if so, which Public Cloud
       # https://github.com/tailscale/tailscale/blob/65fe0ba7b50928eff53e2750ff2d583e4a33eb7e/util/cloudenv/cloudenv.go#L115-L126
-      - /sys/class/dmi/id/bios_vendor
-      - /sys/class/dmi/id/sys_vendor
-      - /sys/class/dmi/id/product_name
-      # the above paths appear to be symlinks to the below
+      # Note that the paths in the source code are symlinks to the corresponding paths below,
+      # so we don't need to include the symlinks, just the target files:
       - /sys/devices/virtual/dmi/id/bios_vendor
       - /sys/devices/virtual/dmi/id/product_name
       - /sys/devices/virtual/dmi/id/sys_vendor
@@ -56,7 +54,7 @@ apps:
       - network
       - network-bind
       - network-control
-      - sys-devices-virtual-info
+      - sys-devices-virtual-dmi-ids
 
 parts:
   tailscale:
