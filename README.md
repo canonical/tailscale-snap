@@ -28,6 +28,32 @@ The snap is strictly confined, and requires the following interfaces:
 - [network-control](https://snapcraft.io/docs/network-control-interface): required for configuring the network and access to /dev/net/tun. Tailscaled needs this to set up networking rules for the wiregard config and such (routing, attaching networks, etc.).
 - `sys-devices-virtual-info`: a custom [system-files](https://snapcraft.io/docs/system-files-interface) read-only interface for files tailscaled needs to determine the platform it's running on.
 
+
+## Integration with other snaps
+
+Other snaps can access tailscaled via its unix socket through the `tailscale:socket` slot.
+This slot exposes a content interface, which will be a directory containing the `tailscaled.sock` socket file.
+
+For example, if there is a snap called `derper`,
+and it has this plug definition:
+
+```
+plugs:
+  tailscale-socket:
+    interface: content
+    content: socket-directory
+    target: $SNAP_DATA/tailscale-socket
+```
+
+Then you can integrate `derper` with `tailscale` like this:
+
+```
+$ sudo snap connect derper:tailscale-socket tailscale:socket
+```
+
+And the tailscaled socket will be available to the `derper` snap
+as `$SNAP_DATA/tailscale-socket/tailscaled.sock`.
+
 ## License
 
 This packaging repository is released under the BSD 3-Clause "New" or "Revised" license.

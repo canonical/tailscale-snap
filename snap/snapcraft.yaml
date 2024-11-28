@@ -40,14 +40,23 @@ plugs:
       - /sys/devices/virtual/dmi/id/product_name
       - /sys/devices/virtual/dmi/id/sys_vendor
 
+slots:
+  # Share the socket directory to support the case where another snap needs to communicate with tailscaled.
+  socket:
+    interface: content
+    content: writable-data
+    write:
+      - $SNAP_DATA/socket
+
 apps:
   tailscale:
-    command: bin/tailscale
+    command: bin/tailscale --socket $SNAP_DATA/socket/tailscaled.sock
     plugs:
       - network
       - network-bind
   tailscaled:
-    command: bin/tailscaled --statedir $SNAP_DATA --verbose 10
+    # NOTE: cannot use layout to support default socket location, because /var/run is not allowed for layout.
+    command: bin/tailscaled --socket $SNAP_DATA/socket/tailscaled.sock --statedir $SNAP_DATA --verbose 10
     daemon: simple
     plugs:
       - firewall-control
@@ -67,8 +76,6 @@ parts:
       - iptables
       - openssh-client  # for tailscale ssh
     override-build: |
-      # Tailscaled socket path is hardcoded, so it must be patched here to work in the snap environment.
-      sed -i paths/paths.go -e 's|"/var/run/tailscale/tailscaled.sock"|filepath.Join(os.Getenv("SNAP_DATA"), "tailscaled.sock")|'
       go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscale
       go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscaled
     override-prime: |
