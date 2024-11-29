@@ -2,8 +2,10 @@
 
 This repository contains the snap package sources for [Tailscale](https://github.com/tailscale/tailscale).
 
-## Build the snap
+For user documentation for the snap, please see [Tailscale on the Snap Store](https://snapcraft.io/tailscale).
+See below for developer documentation.
 
+## Local development
 
 You can build the snap locally with:
 
@@ -11,23 +13,34 @@ You can build the snap locally with:
 snapcraft --use-lxd
 ```
 
-## Confinement
+Then install it (dangerous mode is required for locally built snaps):
 
-The snap is strictly confined, and requires the following interfaces:
+```
+sudo snap install --dangerous ./tailscale_*.snap
+```
 
-### tailscale (the client)
+In dangerous mode, these interfaces are not automatically connected,
+so they must be manually connected:
 
-- [network](https://snapcraft.io/docs/network-interface): general network access.
-- [network-bind](https://snapcraft.io/docs/network-bind-interface): required for `tailscale web`.
+```
+sudo snap connect tailscale:firewall-control
+sudo snap connect tailscale:network-control
+sudo snap connect tailscale:sys-devices-virtual-dmi-ids
+```
 
-### tailscaled (the daemon)
+Once the interfaces are connected,
+then you must restart the tailscaled service
+(it will have failed without the interfaces):
 
-- [firewall-control](https://snapcraft.io/docs/firewall-control-interface): required for setting firewall rules. If this interface is not present, tailscaled will crash.
-- [network](https://snapcraft.io/docs/network-interface): for network access, this is required as tailscaled must communicate with external services (coordination server, etc.) and manage network traffic
-- [network-bind](https://snapcraft.io/docs/network-bind-interface): required because tailscaled binds to a UDP port for wireguard / peer-to-peer traffic.
-- [network-control](https://snapcraft.io/docs/network-control-interface): required for configuring the network and access to /dev/net/tun. Tailscaled needs this to set up networking rules for the wiregard config and such (routing, attaching networks, etc.).
-- `sys-devices-virtual-info`: a custom [system-files](https://snapcraft.io/docs/system-files-interface) read-only interface for files tailscaled needs to determine the platform it's running on.
+```
+sudo snap restart tailscale
+```
 
+Now you can manage tailscale with the `tailscale` command:
+
+```
+tailscale status
+```
 
 ## Integration with other snaps
 
