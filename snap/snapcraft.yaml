@@ -16,11 +16,11 @@ description: |
 
   The snap is strictly confined, and this currently brings some limitations.
 
-  * _tailscale ssh_ will not work.
-  * _ssh_ over the tailscale network will not work if tailscale ssh mode is enabled (ie. if you have configured _tailscale set --ssh_). To fix this, disable tailscale ssh: _tailscale set --ssh=false_.
-  * _tailscale update_ will not work: to update tailscale, please refresh the snap.
-  * _tailscale file cp_ and _tailscale cert_ will only work with file paths accessible to the snap, for example _/home/ubuntu/snap/tailscale/common/foo.txt_. See https://snapcraft.io/docs/data-locations for a full list of paths.
-  * _tailscale drive share_ will not work (the client command succeeds, the share is registered, but you will see errors in tailscaled logs and the share will not be accessible).
+  * `tailscale ssh` will not work.
+  * `ssh` over the tailscale network will not work if tailscale ssh mode is enabled (ie. if you have configured `tailscale set --ssh`). To fix this, disable tailscale ssh: `tailscale set --ssh=false`.
+  * `tailscale update` will not work: to update tailscale, please refresh the snap.
+  * `tailscale file cp` and `tailscale cert` will only work with file paths accessible to the snap, for example `/home/ubuntu/snap/tailscale/common/foo.txt`. See https://snapcraft.io/docs/data-locations for a full list of paths.
+  * `tailscale drive share` will not work (the client command succeeds, the share is registered, but you will see errors in tailscaled logs and the share will not be accessible).
 
   **Security**
 
@@ -37,7 +37,7 @@ description: |
   And for tailscaled (the client tool):
 
   * network: general network access.
-  * network-bind: required for _tailscale web_.
+  * network-bind: required for `tailscale web`.
 
   The snap config or hooks do not directly use any cryptographic functions.
 
