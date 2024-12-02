@@ -25,8 +25,6 @@ description: |
 
 platforms:
   amd64:
-  arm64:
-  armhf:
 
 plugs:
   sys-devices-virtual-dmi-ids:
