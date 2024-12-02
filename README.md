@@ -2,6 +2,9 @@
 
 This repository contains the snap package sources for [Tailscale](https://github.com/tailscale/tailscale).
 
+For user documentation for the snap, please see the [Tailscale on the Snap Store](https://snapcraft.io/tailscale).
+See below for developer documentation.
+
 ## Local development
 
 You can build the snap locally with:
