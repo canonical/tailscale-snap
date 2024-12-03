@@ -4,24 +4,50 @@ version: 1.76.6
 license: BSD-3-Clause
 grade: stable
 confinement: strict
+contact: solutions-engineering@lists.canonical.com
+issues: https://github.com/canonical/tailscale-snap/issues
+source-code: https://github.com/canonical/tailscale-snap
 summary: The easiest, most secure way to use WireGuard and 2FA
 description: |
   A secure network that just works Zero config VPN.
 
-  Installs on any device in minutes, manages firewall rules for you, and works
-  from anywhere.
+  Installs on any device in minutes, manages firewall rules for you, and works from anywhere.
 
-  ## Confinement
+  After installing this snap, visit the Tailscale documentation at https://tailscale.com/kb/1017/install to get started.
+
+  **Confinement**
 
   The snap is strictly confined, and this currently brings some limitations.
 
-  - `tailscale ssh` will not work.
-  - `ssh` over the tailscale network will not work if tailscale ssh mode is enabled (ie. if you have configured `tailscale set --ssh`). To fix this, disable tailscale ssh: `tailscale set --ssh=false`.
-  - `tailscale update` will not work: to update tailscale, please refresh the snap.
-  - `tailscale file cp` and `tailscale cert` will only work with file paths accessible to the snap, for example `/home/ubuntu/snap/tailscale/common/foo.txt`. See snap [data locations](https://snapcraft.io/docs/data-locations) for a full list.
-  - `tailscale drive share` will not work (the client command succeeds, the share is registered, but you will see errors in tailscaled logs and the share will not be accessible).
+  * `tailscale ssh` will not work.
+  * `ssh` over the tailscale network will not work if tailscale ssh mode is enabled (ie. if you have configured `tailscale set --ssh`). To fix this, disable tailscale ssh: `tailscale set --ssh=false`.
+  * `tailscale update` will not work: to update tailscale, please refresh the snap.
+  * `tailscale file cp` and `tailscale cert` will only work with file paths accessible to the snap, for example `/home/ubuntu/snap/tailscale/common/foo.txt`. See https://snapcraft.io/docs/data-locations for a full list of paths.
+  * `tailscale drive share` will not work (the client command succeeds, the share is registered, but you will see errors in tailscaled logs and the share will not be accessible).
 
-  If any malfunction with Tailscale features is observed, where this issue is not observed in Tailscale installed from a source other than the snap, please [open an issue](https://github.com/canonical/tailscale-snap/issues).
+  **Security**
+
+  Please see https://tailscale.com/security for information about security of Tailscale itself.
+  For this snap, it is strictly confined, to limit the impact if the binaries are compromised.
+  The following interfaces are connected for tailscaled (the daemon):
+
+  - network: for network access, this is required as tailscaled must communicate with external services (coordination server, etc.) and manage network traffic
+  - network-bind: required because tailscaled binds to a UDP port for wireguard / peer-to-peer traffic.
+  - firewall-control: required for setting firewall rules. If this interface is not present, tailscaled will crash.
+  - network-control: required for configuring the network and access to /dev/net/tun. Tailscaled needs this to set up networking rules for the wiregard config and such (routing, attaching networks, etc.).
+  - sys-devices-virtual-info: a custom system-files read-only interface for files tailscaled needs to determine the platform it's running on.
+
+  And for tailscaled (the client tool):
+
+  * network: general network access.
+  * network-bind: required for `tailscale web`.
+
+  The snap config or hooks do not directly use any cryptographic functions.
+
+  **Support**
+
+  If any malfunction with Tailscale features is observed, where this issue is not observed in Tailscale installed from a source other than the snap, please open an issue at https://github.com/canonical/tailscale-snap/issues .
+  To report something related to Tailscale itself, please see https://github.com/tailscale/tailscale/issues .
 
 platforms:
   amd64:
