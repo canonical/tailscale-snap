@@ -6,6 +6,7 @@ grade: stable
 confinement: strict
 contact: solutions-engineering@lists.canonical.com
 issues: https://github.com/canonical/tailscale-snap/issues
+source-code: https://github.com/canonical/tailscale-snap
 summary: The easiest, most secure way to use WireGuard and 2FA
 description: |
   A secure network that just works Zero config VPN.
