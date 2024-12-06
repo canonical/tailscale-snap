@@ -44,4 +44,5 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_LOGIN }}
         with:
           snap: ${{ env.SNAP_FILE }}
+          # Comma-separated list of channels to release the snap to.
           release: latest/edge
