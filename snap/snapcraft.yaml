@@ -51,6 +51,7 @@ description: |
 
 platforms:
   amd64:
+  arm64:
 
 plugs:
   sys-devices-virtual-dmi-ids:
