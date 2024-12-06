@@ -2,4 +2,4 @@
 
 # Ensure the custom socket dir exists.
 # This is shared on a content interface so that compatible snaps can access the tailscale socket if needed.
-mkdir -p $SNAP_DATA/socket
+mkdir -p $SNAP_COMMON/socket

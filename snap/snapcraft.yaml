@@ -71,17 +71,17 @@ slots:
     interface: content
     content: writable-data
     write:
-      - $SNAP_DATA/socket
+      - $SNAP_COMMON/socket
 
 apps:
   tailscale:
-    command: bin/tailscale --socket $SNAP_DATA/socket/tailscaled.sock
+    command: bin/tailscale --socket $SNAP_COMMON/socket/tailscaled.sock
     plugs:
       - network
       - network-bind
   tailscaled:
     # NOTE: cannot use layout to support default socket location, because /var/run is not allowed for layout.
-    command: bin/tailscaled --socket $SNAP_DATA/socket/tailscaled.sock --statedir $SNAP_DATA --verbose 10
+    command: bin/tailscaled --socket $SNAP_COMMON/socket/tailscaled.sock --statedir $SNAP_COMMON --verbose 10
     daemon: simple
     plugs:
       - firewall-control

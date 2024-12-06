@@ -55,7 +55,7 @@ plugs:
   tailscale-socket:
     interface: content
     content: socket-directory
-    target: $SNAP_DATA/tailscale-socket
+    target: $SNAP_COMMON/tailscale-socket
 ```
 
 Then you can integrate `derper` with `tailscale` like this:
@@ -65,7 +65,7 @@ $ sudo snap connect derper:tailscale-socket tailscale:socket
 ```
 
 And the tailscaled socket will be available to the `derper` snap
-as `$SNAP_DATA/tailscale-socket/tailscaled.sock`.
+as `$SNAP_COMMON/tailscale-socket/tailscaled.sock`.
 
 ## License
 
