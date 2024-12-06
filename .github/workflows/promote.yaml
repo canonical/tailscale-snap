@@ -12,9 +12,7 @@ on:
         description: 'Channel Promotion, e.g. latest/edge -> latest/candidate'
         required: true
         type: choice
-        options:
-          - 'latest/edge -> latest/candidate'
-          - 'latest/candidate -> latest/stable'
+        options: ['latest/edge -> latest/candidate', 'latest/candidate -> latest/stable']
 
 jobs:
   promote-snap:

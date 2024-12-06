@@ -31,13 +31,13 @@ description: |
   For this snap, it is strictly confined, to limit the impact if the binaries are compromised.
   The following interfaces are connected for tailscaled (the daemon):
 
-  - network: for network access, this is required as tailscaled must communicate with external services (coordination server, etc.) and manage network traffic
-  - network-bind: required because tailscaled binds to a UDP port for wireguard / peer-to-peer traffic.
-  - firewall-control: required for setting firewall rules. If this interface is not present, tailscaled will crash.
-  - network-control: required for configuring the network and access to /dev/net/tun. Tailscaled needs this to set up networking rules for the wiregard config and such (routing, attaching networks, etc.).
-  - sys-devices-virtual-info: a custom system-files read-only interface for files tailscaled needs to determine the platform it's running on.
+  * network: for network access, this is required as tailscaled must communicate with external services (coordination server, etc.) and manage network traffic
+  * network-bind: required because tailscaled binds to a UDP port for wireguard / peer-to-peer traffic.
+  * firewall-control: required for setting firewall rules. If this interface is not present, tailscaled will crash.
+  * network-control: required for configuring the network and access to /dev/net/tun. Tailscaled needs this to set up networking rules for the wiregard config and such (routing, attaching networks, etc.).
+  * sys-devices-virtual-info: a custom system-files read-only interface for files tailscaled needs to determine the platform it's running on.
 
-  And for tailscaled (the client tool):
+  And for tailscale (the client tool):
 
   * network: general network access.
   * network-bind: required for `tailscale web`.
