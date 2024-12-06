@@ -35,7 +35,7 @@ description: |
   * network-bind: required because tailscaled binds to a UDP port for wireguard / peer-to-peer traffic.
   * firewall-control: required for enforcing port-level ACLs through iptables.
   * network-control: required for configuring the network and access to /dev/net/tun. Tailscaled needs this to set up networking rules for the wiregard config and such (routing, attaching networks, etc.).
-  * sys-devices-virtual-info: a custom system-files read-only interface for files tailscaled needs to determine the platform it's running on.
+  * sys-devices-virtual-info: a custom system-files read-only interface for files tailscaled needs to determine the platform it's running on. Without this, tailscaled will run, but may have issues in some environments.
 
   And for tailscale (the client tool):
 
