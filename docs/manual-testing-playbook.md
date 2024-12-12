@@ -63,19 +63,21 @@ for vm in $TAILSCALE_VM_1 $TAILSCALE_VM_2; do
 done
 ```
 
-## Test smaller functionality
+## Test functionality not affected by confinement
 
 None of these are affected by snap confinement,
 and should work as officially documented.
 
-Test `tailscale netcheck`.
+### Tailscale netcheck
+
 Expect a report with network information and a list of derp server latencies.
 
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale netcheck
 ```
 
-Test `tailscale ip`.
+### Tailscale ip
+
 This should print the tailnet ips for the local machine.
 They should match the ips shown for the `tailscale0` interface from `ip -br a`.
 
@@ -84,7 +86,8 @@ lxc exec $TAILSCALE_VM_1 -- ip -br a
 lxc exec $TAILSCALE_VM_1 -- tailscale ip
 ```
 
-Test `tailscale version`.
+### Tailscale version
+
 Expect the output to be the same as the snap version (maybe with a trailing revision).
 If not, then the snap packaged the wrong tailscale version.
 
@@ -92,14 +95,16 @@ If not, then the snap packaged the wrong tailscale version.
 lxc exec $TAILSCALE_VM_1 -- tailscale version
 ```
 
-Test `tailscale licenses`.
+### Tailscale licenses
+
 Expect this to simply print a message about open source licenses and a link to more information.
 
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale licenses
 ```
 
-Test `tailscale whois`.
+### Tailscale whois
+
 Set `addr` to the tailnet address of another Tailscale machine.
 You should see information about the target machine and Tailscale user.
 
@@ -108,7 +113,8 @@ addr=100.126.120.25
 lxc exec $TAILSCALE_VM_1 -- tailscale whois $addr
 ```
 
-Test `tailscale exit-node`.
+### Tailscale exit-node
+
 These should succeed,
 but they will probably list no exit nodes and no suggestions.
 
@@ -117,18 +123,18 @@ lxc exec $TAILSCALE_VM_1 -- tailscale exit-node list
 lxc exec $TAILSCALE_VM_1 -- tailscale exit-node suggest
 ```
 
-Test `tailscale bugreport`.
+### Tailscale bugreport
+
 Expect a long string starting with "BUG-" (printed as an identifier to use in bug reports).
 
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale bugreport
 ```
 
-Test bash completion.
+### Bash completion
 
 ```bash
-vm="$TAILSCALE_VM_2"
-lxc exec $vm -- bash
+lxc exec $TAILSCALE_VM_1 -- bash
 
 # In the vm:
 
@@ -140,4 +146,116 @@ lxc exec $vm -- bash
 # Type `tailscale ` and press tab twice. Verify that you see tailscales-specific completion
 ```
 
-...
+### tailscale nc
+
+In one terminal:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- python3 -m http.server
+```
+
+And in another:
+
+```bash
+lxc exec $TAILSCALE_VM_2 -- sh -c "printf 'GET /\n\n' | tailscale nc $TAILSCALE_VM_1 8000"
+```
+
+You should see a log line from the python http server indicating a get request to `/`, with a `200` response.
+
+---
+
+TODO
+working - not necessarily tested with all flags though:
+- tailscale up
+- tailscale down
+- tailscale login
+- tailscale logout
+- tailscale web
+- tailscale ping
+- tailscale set
+- tailscale serve
+- tailscale funnel (it didn't work on "the internet" - I could still only resolve the domain in the tailnet, but nothing from the snap should be causing that)
+- tailscale dns status
+
+
+## Functionality affected by strict confinement
+
+This functionality works to some extend,
+but comes with some limitations due to strict confinement.
+
+### Tailscale file copying
+
+For copying a file from one tailscale machine to another.
+This does work, but only for file and directory locations accessible by the snap.
+For the tailscale snap, these paths will be:
+
+- `SNAP_USER_COMMON`: `$HOME/snap/tailscale/common`
+- `SNAP_USER_DATA`: `$HOME/snap/tailscale/x$N`
+- `SNAP_COMMON`: `/var/snap/tailscale/common` (only writable if running tailscale as root)
+- `SNAP_DATA`: `/var/snap/tailscale/x$N` (only writable if running tailscale as root)
+
+See https://ubuntu.com/robotics/docs/snap-data-and-file-storage for more information on the file paths.
+
+To test a successful case of file copying between hosts:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- sh -c "echo hello | tee snap/tailscale/common/greeting.txt"
+lxc exec $TAILSCALE_VM_1 -- tailscale file cp snap/tailscale/common/greeting.txt $TAILSCALE_VM_2:
+
+lxc exec $TAILSCALE_VM_2 -- tailscale file get -conflict overwrite snap/tailscale/common/
+lxc exec $TAILSCALE_VM_2 -- cat snap/tailscale/common/greeting.txt  # expect "hello" output
+```
+
+To test a failure case - attempting to copy a file from a directory not readable by the Tailscale snap:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- sh -c "echo 'file in home dir' | tee home.txt"
+lxc exec $TAILSCALE_VM_1 -- tailscale file cp home.txt $TAILSCALE_VM_2:
+```
+
+The result should be `open home.txt: permission denied`.
+
+### Tailscale drive
+
+For sharing a directory over webdav.
+
+TODO - this is WIP
+```bash
+lxc exec $TAILSCALE_VM_1 -- bash
+tailscale drive {list,rename,unshare}
+```
+sharing a drive does not work (although the commands appear to succeed).
+See:
+https://github.com/tailscale/tailscale/blob/e3c6ca43d3e3cad27714d07b3a9ec20141c9c65c/drive/driveimpl/remote_impl.go#L336-L355
+
+tailscaled in the snap is running as root, without access to su.
+So the su check fails, and the check for running as non-root user also fails.
+This is regardless of file paths and file permissions.
+
+TODO
+- tailscale cert (if writing to files in a writable snap data dir
+- tailscale up --ssh (and others?)
+- tailscale set ssh mode
+
+## Functionality not working
+
+This functionality does not work,
+due to being strictly confined.
+
+
+TODO
+does not work:
+- tailscale drive share
+- tailscale ssh (didn't re-test)
+- tailscale dns query
+
+
+
+## Unknowns
+
+Untested; this playbook does not cover these cases.
+
+- tailscale update (it won't work, crashing with a permissions error - TODO: add an example test for this, even if we can't test it if tailscale is at the latest version)
+- tailscale switch (untested - requires multiple accounts. no reason for it to not work though)
+- tailscale configure kubeconfig (untested - requires k8s server. This may not work if requires file paths, etc., but the command is alpha)
+- tailscale lock
