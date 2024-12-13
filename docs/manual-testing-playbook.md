@@ -215,22 +215,9 @@ lxc exec $TAILSCALE_VM_1 -- tailscale file cp home.txt $TAILSCALE_VM_2:
 
 The result should be `open home.txt: permission denied`.
 
-### Tailscale drive
 
-For sharing a directory over webdav.
+---
 
-TODO - this is WIP
-```bash
-lxc exec $TAILSCALE_VM_1 -- bash
-tailscale drive {list,rename,unshare}
-```
-sharing a drive does not work (although the commands appear to succeed).
-See:
-https://github.com/tailscale/tailscale/blob/e3c6ca43d3e3cad27714d07b3a9ec20141c9c65c/drive/driveimpl/remote_impl.go#L336-L355
-
-tailscaled in the snap is running as root, without access to su.
-So the su check fails, and the check for running as non-root user also fails.
-This is regardless of file paths and file permissions.
 
 TODO
 - tailscale cert (if writing to files in a writable snap data dir
@@ -242,13 +229,88 @@ TODO
 This functionality does not work,
 due to being strictly confined.
 
+### Tailscale drive
+
+For sharing a directory over webdav.
+Sharing a drive does not work (although the command appears to succeed).
+The drive management commands do work though: list, rename and unshare.
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- mkdir snap/tailscale/common/drive
+lxc exec $TAILSCALE_VM_1 -- tailscale drive share mydrive snap/tailscale/common/drive
+lxc exec $TAILSCALE_VM_1 -- tailscale drive list  # mydrive listed
+lxc exec $TAILSCALE_VM_1 -- tailscale drive rename mydrive mydrive2
+lxc exec $TAILSCALE_VM_1 -- tailscale drive list  # mydrive2 listed
+lxc exec $TAILSCALE_VM_1 -- tailscale drive unshare mydrive2
+lxc exec $TAILSCALE_VM_1 -- tailscale drive list  # no drives listed
+```
+
+For an explanation of why sharing a drive doesn't work in the confined snap:
+
+See
+https://github.com/tailscale/tailscale/blob/e3c6ca43d3e3cad27714d07b3a9ec20141c9c65c/drive/driveimpl/remote_impl.go#L336-L355 .
+Tailscaled in the snap is running as root, without access to su.
+So the su check fails, and the check for running as non-root user also fails.
+This is regardless of file paths and file permissions.
+You can see the error messages in the tailscaled logs (`snap logs tailscale`).
+
+### Tailscale dns
+
+Tailscale manages the system DNS by default (it can be turned off via `tailscale set --accept-dns=false`).
+It also provides a `tailscale dns` subcommand that can be used to test the resolver and view the status.
+
+Check the status of the Tailscale DNS service on the host:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale dns status
+```
+
+With the default configuration, this should indicate that Tailscale DNS is enabled, and print information about MagicDNS, Tailscale FQDN (fully qualified domain name) of the machine, DNS routes, and search domains.
+You may see a note about "reading the system DNS configuration is not supported on this platform";
+this does not appear to be related to snap confinement, merely a system limitation.
+
+Now we can test resolving the Tailscale MagicDNS FQDN through the `tailscale dns query` subcommand,
+as well as the system resolver.
+
+```bash
+TAILNET_DOMAIN=$(lxc exec $TAILSCALE_VM_1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
+lxc exec $TAILSCALE_VM_1 -- tailscale dns query $TAILSCALE_VM_2.$TAILNET_DOMAIN a
+lxc exec $TAILSCALE_VM_1 -- dig $TAILSCALE_VM_2.$TAILNET_DOMAIN
+```
+
+Both of the above queries should return the same ipv4 address: the tailnet address of `TAILSCALE_VM_2`.
+Resolvectl should confirm the system DNS settings applied by tailscale:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- resolvectl
+```
+
+Note that DNS queries for the bare machine name don't work (no result returned):
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale dns query $TAILSCALE_VM_2 a
+lxc exec $TAILSCALE_VM_1 -- dig $TAILSCALE_VM_2
+```
+
+This is unexpected, but does not appear to be related to snap confinement.
+
+### Tailscale SSH
 
 TODO
-does not work:
-- tailscale drive share
-- tailscale ssh (didn't re-test)
-- tailscale dns query
 
+
+### Tailscale update
+
+Tailscale includes a built in updater, which won't work because the snap files are immutable.
+The behaviour will look like this:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale update --yes
+```
+
+Output:
+
+> open /etc/apt/sources.list.d/tailscale.list: no such file or directory
 
 
 ## Unknowns
