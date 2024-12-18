@@ -328,11 +328,102 @@ Verify that `ip -br address` above shows the tailnet addresses.
 
 ### Tailscale serve
 
-TODO
+`tailscale serve` acts as a reverse proxy for a local HTTP/S server,
+to expose it securely within the tailnet.
+
+To test this, run this example webserver in one terminal:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- mkdir tmp-server
+lxc exec $TAILSCALE_VM_1 -- touch tmp-server/test-file-1.txt
+lxc exec $TAILSCALE_VM_1 --cwd /root/tmp-server -- python3 -m http.server --bind 127.0.0.1 8000
+```
+
+And run the tailscale serve process in another terminal:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale serve 8000
+```
+
+Example output:
+
+```text
+Available within your tailnet:
+
+https://tailscale-1.taild11111.ts.net/
+|-- proxy http://127.0.0.1:8000
+
+Press Ctrl+C to exit.
+```
+
+And finally in a third terminal, test you can reach the server from the second VM:
+
+```bash
+TAILNET_DOMAIN=$(lxc exec $TAILSCALE_VM_1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
+lxc exec $TAILSCALE_VM_2 -- curl https://$TAILSCALE_VM_1.$TAILNET_DOMAIN
+```
+
+Verify you see an HTML response of a directory listing including the `test-file-1.txt` created above.
+
+Try to navigate to the https tailnet url from your local web browser (on a machine connected to the internet, but not to the tailnet),
+and verify that it is not accessible.
 
 ### Tailscale funnel
 
-TODO
+`tailscale funnel` acts as a reverse proxy for a local HTTP/S server,
+to expose it securely to the public internet.
+
+To test this, run this example webserver in one terminal:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- mkdir tmp-server2
+lxc exec $TAILSCALE_VM_1 -- touch tmp-server2/test-file-2.txt
+lxc exec $TAILSCALE_VM_1 --cwd /root/tmp-server2 -- python3 -m http.server --bind 127.0.0.1 8000
+```
+
+And run the tailscale funnel process in another terminal:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale funnel 8000
+```
+
+Example output:
+
+```text
+Funnel is not enabled on your tailnet.
+To enable, visit:
+
+         https://login.tailscale.com/f/funnel?node=1111B111111111T1L
+```
+
+Funnel is not enabled on a tailnet by default.
+Please configure it now by navigating to the url printed by the command,
+and clicking the "Enable" button to confirm.
+
+Once you have enabled it, the `tailscale funnel` command should print more output
+to confirm that it is now working:
+
+```text
+...
+Success.
+Available on the internet:
+
+https://tailscale-1.taild11111.ts.net/
+|-- proxy http://127.0.0.1:8000
+
+Press Ctrl+C to exit.
+```
+
+Try to navigate to the https tailnet url from your local web browser (on a machine connected to the internet, but not to the tailnet),
+and verify you see an HTML response of a directory listing including the `test-file-2.txt` created above.
+This verifies that the proxied service is indeed visible to the internet.
+
+Note: the [Tailscale funnel docs](https://tailscale.com/kb/1223/funnel#dns-propagation) state
+that you may need to wait up to 10 minutes for DNS records to propagate,
+before you can access the url.
+However, in testing, the domain could not be resolved even after waiting longer than the 10 minutes.
+The cause is to be confirmed.
+
 
 ## Functionality affected by strict confinement
 
@@ -429,14 +520,11 @@ MIIDmjCCAyCgAwIBAgISA9asmzuogjk4Nz3...
 ...
 ```
 
-
 Or to a file within the directories accessible by the snap (this command should also succeed):
 
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale cert --cert-file ./snap/tailscale/common/cert.crt --key-file ./snap/tailscale/common/cert.key $TAILSCALE_VM_1.$TAILNET_DOMAIN
 lxc exec $TAILSCALE_VM_1 -- ls ./snap/tailscale/common/
-# cleanup
-lxc exec $TAILSCALE_VM_1 -- rm ./snap/tailscale/common/cert.crt ./snap/tailscale/common/cert.key
 ```
 
 ## Functionality not working
@@ -511,8 +599,7 @@ This is unexpected, but does not appear to be related to snap confinement.
 
 ### Tailscale SSH
 
-TODO
-- tailscaled in ssh mode does not work (incoming ssh connections on the tailnet will not work, failing with permission denied).
+- Tailscaled in ssh mode (ie. run with `--ssh`) does not work (incoming ssh connections on the tailnet will not work, failing with permission denied).
 - `tailscale ssh` will work if sshing to a host running tailscaled, if that tailscaled is not installed via the strictly confined snap.
 
 ### Tailscale update
@@ -534,8 +621,9 @@ If Tailscale is already at the latest version, you will simply see a message abo
 
 ## Unknowns
 
-Untested; this playbook does not cover these cases.
+Untested cases that are not covered in this playbook:
 
-- tailscale switch (untested - requires multiple accounts. no reason for it to not work though, since the login/logout commands work.)
-- tailscale configure kubeconfig (untested - requires k8s server. This may not work if requires file paths, etc., but the command is alpha)
-- tailscale lock
+- `tailscale switch`: This requires multiple accounts. No reason for it to not work though, since the login/logout sub commands work.
+- `tailscale configure kubeconfig`: This requires a Kubernetes cluster. This may not work if requires certain file paths, but otherwise may work fine.
+- `tailscale lock`: Untested, but should work correctly.
+- Arguments to `tailscale up`, `tailscale login`, or `tailscale set`: As noted in an earlier section, there are many options. `--ssh` is known to not work, but the others should work.
