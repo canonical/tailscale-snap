@@ -106,7 +106,7 @@ lxc exec $TAILSCALE_VM_1 -- tailscale version
 
 Output example:
 
-```txt
+```text
 1.76.6-dev20241104
   tailscale commit: 1edcf9d466ceafedd2816db1a24d5ba4b0b18a5b
   go version: go1.23.3
@@ -114,10 +114,20 @@ Output example:
 
 ### Tailscale licenses
 
-Expect this to simply print a message about open source licenses and a link to more information.
+This simply prints a message about open source licenses and a link to more information.
 
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale licenses
+```
+
+Expected output:
+
+```text
+Tailscale wouldn't be possible without the contributions of thousands of open
+source developers. To see the open source packages included in Tailscale and
+their respective license information, visit:
+
+    https://tailscale.com/licenses/tailscale
 ```
 
 ### Tailscale whois
@@ -130,6 +140,18 @@ addr=100.126.120.25
 lxc exec $TAILSCALE_VM_1 -- tailscale whois $addr
 ```
 
+Example output (redacted):
+
+```text
+Machine:
+  Name:          tailscale-2.taild....ts.net
+  ID:            ...
+  Addresses:     [100.../32 fd7a:.../128]
+User:
+  Name:     ...
+  ID:       ...
+```
+
 ### Tailscale exit-node
 
 These should succeed,
@@ -140,12 +162,26 @@ lxc exec $TAILSCALE_VM_1 -- tailscale exit-node list
 lxc exec $TAILSCALE_VM_1 -- tailscale exit-node suggest
 ```
 
+Example output:
+
+```text
+no exit nodes found
+
+No exit node suggestion is available.
+```
+
 ### Tailscale bugreport
 
-Expect a long string starting with "BUG-" (printed as an identifier to use in bug reports).
+This simply prints a unique identifier to use in bug reports.
 
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale bugreport
+```
+
+Example expected output:
+
+```text
+BUG-4db3f...
 ```
 
 ### Bash completion
@@ -160,10 +196,21 @@ lxc exec $TAILSCALE_VM_1 -- bash
 
 . /etc/bash_completion
 . <( tailscale completion bash )
-# Type `tailscale ` and press tab twice. Verify that you see tailscales-specific completion
+# Type `tailscale ` and press tab twice. Verify that you see tailscale-specific completion
 ```
 
-### tailscale nc
+Example:
+
+```text
+$ tailscale <TAB><TAB>
+bugreport   (Print a shareable identifier to help diagnose issues)
+cert        (Get TLS certs)
+completion  (Shell tab-completion scripts)
+configure   ([ALPHA] Configure the host to enable more Tailscale features)
+...
+```
+
+### Tailscale nc
 
 In one terminal:
 
@@ -179,6 +226,29 @@ lxc exec $TAILSCALE_VM_2 -- sh -c "printf 'GET /\n\n' | tailscale nc $TAILSCALE_
 
 You should see a log line from the python http server indicating a get request to `/`, with a `200` response.
 
+### Tailscale web
+
+Tailscale web runs a web server that you can use to control tailscaled.
+
+To test this, you can run this to start the server:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale web --listen 0.0.0.0:8088
+```
+
+Example output:
+
+```text
+2024/12/18 04:54:12 web server running on: http://0.0.0.0:8088
+```
+
+And navigate to the lxd network ip address of the VM at port 8088 in your local web browser.
+You should see a webpage with information about tailscale on the machine.
+It is expected to be in "viewing" mode, if you're accessing from a host machine that isn't in logged into the same tailnet with tailscale.
+
+When finished, you can press `ctrl+c` in the terminal to interrupt and stop the web server.
+
+
 ---
 
 TODO
@@ -187,12 +257,10 @@ working - not necessarily tested with all flags though:
 - tailscale down
 - tailscale login
 - tailscale logout
-- tailscale web
 - tailscale ping
 - tailscale set
 - tailscale serve
 - tailscale funnel (it didn't work on "the internet" - I could still only resolve the domain in the tailnet, but nothing from the snap should be causing that)
-- tailscale dns status
 
 
 ## Functionality affected by strict confinement
@@ -257,7 +325,7 @@ lxc exec $TAILSCALE_VM_1 -- tailscale cert --cert-file - --key-file - $TAILSCALE
 
 Output example:
 
-```txt
+```text
 -----BEGIN CERTIFICATE-----
 MIIDmjCCAyCgAwIBAgISA9asmzuogjk4Nz3...
 ...
@@ -360,7 +428,7 @@ lxc exec $TAILSCALE_VM_1 -- tailscale update --yes
 
 Output:
 
-```txt
+```text
 open /etc/apt/sources.list.d/tailscale.list: no such file or directory
 ```
 
