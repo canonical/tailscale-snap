@@ -215,14 +215,34 @@ lxc exec $TAILSCALE_VM_1 -- tailscale file cp home.txt $TAILSCALE_VM_2:
 
 The result should be `open home.txt: permission denied`.
 
+### Tailscale HTTPS certificates
 
----
+To test this, you will need to enable the HTTPS certificates feature on your tailnet.
+Navigate to https://login.tailscale.com/admin/dns, scroll down to "HTTPS Certificates", click "Enable HTTPS...", then click "Enable" to confirm.
 
+Now we can test the default case of requesting a certificate for the local machine (this is expected to fail):
 
-TODO
-- tailscale cert (if writing to files in a writable snap data dir
-- tailscale up --ssh (and others?)
-- tailscale set ssh mode
+```bash
+TAILNET_DOMAIN=$(lxc exec $TAILSCALE_VM_1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
+lxc exec $TAILSCALE_VM_1 -- tailscale cert $TAILSCALE_VM_1.$TAILNET_DOMAIN
+```
+
+The above command fails with a permission denied error on attempting to open a file in the home directory.
+This is expected, and due to the strict confinement.
+To workaround this, you can either output the cert files to stdout (this command should succeed):
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale cert --cert-file - --key-file - $TAILSCALE_VM_1.$TAILNET_DOMAIN
+```
+
+Or to a file within the directories accessible by the snap (this command should also succeed):
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale cert --cert-file ./snap/tailscale/common/cert.crt --key-file ./snap/tailscale/common/cert.key $TAILSCALE_VM_1.$TAILNET_DOMAIN
+lxc exec $TAILSCALE_VM_1 -- ls ./snap/tailscale/common/
+# cleanup
+lxc exec $TAILSCALE_VM_1 -- rm ./snap/tailscale/common/cert.crt ./snap/tailscale/common/cert.key
+```
 
 ## Functionality not working
 
@@ -297,12 +317,13 @@ This is unexpected, but does not appear to be related to snap confinement.
 ### Tailscale SSH
 
 TODO
-
+- tailscaled in ssh mode does not work (incoming ssh connections on the tailnet will not work, failing with permission denied).
+- `tailscale ssh` will work if sshing to a host running tailscaled, if that tailscaled is not installed via the strictly confined snap.
 
 ### Tailscale update
 
 Tailscale includes a built in updater, which won't work because the snap files are immutable.
-The behaviour will look like this:
+The behaviour will look like this (if a newer version of Tailscale is available):
 
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale update --yes
@@ -312,12 +333,12 @@ Output:
 
 > open /etc/apt/sources.list.d/tailscale.list: no such file or directory
 
+If Tailscale is already at the latest version, you will simply see a message about no updates needed.
 
 ## Unknowns
 
 Untested; this playbook does not cover these cases.
 
-- tailscale update (it won't work, crashing with a permissions error - TODO: add an example test for this, even if we can't test it if tailscale is at the latest version)
-- tailscale switch (untested - requires multiple accounts. no reason for it to not work though)
+- tailscale switch (untested - requires multiple accounts. no reason for it to not work though, since the login/logout commands work.)
 - tailscale configure kubeconfig (untested - requires k8s server. This may not work if requires file paths, etc., but the command is alpha)
 - tailscale lock
