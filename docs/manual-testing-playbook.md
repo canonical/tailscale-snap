@@ -78,10 +78,12 @@ lxc exec $TAILSCALE_VM_1 -- tailscale netcheck
 
 Output example:
 
-> Report:
->         * UDP: true
->         * IPv4: yes, 61.245.148.199:38896
-> ...
+```txt
+Report:
+        * UDP: true
+        * IPv4: yes, 61.245.148.199:38896
+...
+```
 
 ### Tailscale ip
 
@@ -104,9 +106,11 @@ lxc exec $TAILSCALE_VM_1 -- tailscale version
 
 Output example:
 
-> 1.76.6-dev20241104
->   tailscale commit: 1edcf9d466ceafedd2816db1a24d5ba4b0b18a5b
->   go version: go1.23.3
+```txt
+1.76.6-dev20241104
+  tailscale commit: 1edcf9d466ceafedd2816db1a24d5ba4b0b18a5b
+  go version: go1.23.3
+```
 
 ### Tailscale licenses
 
@@ -251,10 +255,13 @@ To workaround this, you can either output the cert files to stdout (this command
 lxc exec $TAILSCALE_VM_1 -- tailscale cert --cert-file - --key-file - $TAILSCALE_VM_1.$TAILNET_DOMAIN
 ```
 
-Output:
+Output example:
 
-> -----BEGIN CERTIFICATE-----
-> MIIDmjCCAyCgAwIBAgISA9asmzuogjk4Nz3...
+```txt
+-----BEGIN CERTIFICATE-----
+MIIDmjCCAyCgAwIBAgISA9asmzuogjk4Nz3...
+...
+```
 
 
 Or to a file within the directories accessible by the snap (this command should also succeed):
@@ -353,7 +360,9 @@ lxc exec $TAILSCALE_VM_1 -- tailscale update --yes
 
 Output:
 
-> open /etc/apt/sources.list.d/tailscale.list: no such file or directory
+```txt
+open /etc/apt/sources.list.d/tailscale.list: no such file or directory
+```
 
 If Tailscale is already at the latest version, you will simply see a message about no updates needed.
 
