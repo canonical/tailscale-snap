@@ -76,6 +76,13 @@ Expect a report with network information and a list of derp server latencies.
 lxc exec $TAILSCALE_VM_1 -- tailscale netcheck
 ```
 
+Output example:
+
+> Report:
+>         * UDP: true
+>         * IPv4: yes, 61.245.148.199:38896
+> ...
+
 ### Tailscale ip
 
 This should print the tailnet ips for the local machine.
@@ -94,6 +101,12 @@ If not, then the snap packaged the wrong tailscale version.
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale version
 ```
+
+Output example:
+
+> 1.76.6-dev20241104
+>   tailscale commit: 1edcf9d466ceafedd2816db1a24d5ba4b0b18a5b
+>   go version: go1.23.3
 
 ### Tailscale licenses
 
@@ -227,13 +240,22 @@ TAILNET_DOMAIN=$(lxc exec $TAILSCALE_VM_1 -- sh -c "tailscale dns status | awk '
 lxc exec $TAILSCALE_VM_1 -- tailscale cert $TAILSCALE_VM_1.$TAILNET_DOMAIN
 ```
 
-The above command fails with a permission denied error on attempting to open a file in the home directory.
-This is expected, and due to the strict confinement.
+Output:
+
+> open ./tailscale-1.taild742dc.ts.net.crt.tmp2631737963: permission denied
+
+This failure to create the cert file in the home directory is expected due to strict confinement.
 To workaround this, you can either output the cert files to stdout (this command should succeed):
 
 ```bash
 lxc exec $TAILSCALE_VM_1 -- tailscale cert --cert-file - --key-file - $TAILSCALE_VM_1.$TAILNET_DOMAIN
 ```
+
+Output:
+
+> -----BEGIN CERTIFICATE-----
+> MIIDmjCCAyCgAwIBAgISA9asmzuogjk4Nz3...
+
 
 Or to a file within the directories accessible by the snap (this command should also succeed):
 
