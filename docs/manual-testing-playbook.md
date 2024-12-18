@@ -91,7 +91,7 @@ This should print the tailnet ips for the local machine.
 They should match the ips shown for the `tailscale0` interface from `ip -br a`.
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- ip -br a
+lxc exec $TAILSCALE_VM_1 -- ip -br a show tailscale0
 lxc exec $TAILSCALE_VM_1 -- tailscale ip
 ```
 
@@ -248,25 +248,123 @@ It is expected to be in "viewing" mode, if you're accessing from a host machine 
 
 When finished, you can press `ctrl+c` in the terminal to interrupt and stop the web server.
 
+### Tailscale ping
 
----
+This provides a way to ping other machines on the tailnet:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale ping $TAILSCALE_VM_2
+```
+
+Example output:
+
+```text
+pong from tailscale-2 (100.108.34.59) via 10.177.175.233:38425 in 1ms
+```
+
+### Tailscale up and tailscale down
+
+These subcommands are for bringing the network up and down,
+without re-authentication required.
+
+To test `tailscale down`:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale down
+lxc exec $TAILSCALE_VM_1 -- ip -br address show tailscale0
+```
+
+Verify that the `ip -br address show` command shows either no addresses, or only an ipv6 link local address.
+The machine is no longer connected to the tailnet.
+
+To test `tailscale up`:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale up
+lxc exec $TAILSCALE_VM_1 -- ip -br address show tailscale0
+```
+
+Verify that the tailnet was brought up on the machine without any reauthentication required,
+and that `ip -br address` shows the tailnet addresses.
+
+### Tailscale login and tailscale logout
+
+These subcommands are for logging out and in,
+taking the network down when logging out,
+and requiring authentication and bringing the network back up when logging in.
+
+To test `tailscale logout`:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale logout
+lxc exec $TAILSCALE_VM_1 -- ip -br address show tailscale0
+```
+
+Verify that the `ip -br address show` command shows either no addresses, or only an ipv6 link local address.
+The machine is no longer connected to the tailnet.
+
+To test `tailscale login`:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale login
+```
+
+You should see the authentication request - example output:
+
+```text
+To authenticate, visit:
+
+        https://login.tailscale.com/a/redacted
+```
+
+Click the link and authorise the login.
+Then you can check the network on the machine again:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- ip -br address show tailscale0
+```
+
+Verify that `ip -br address` above shows the tailnet addresses.
+
+### Tailscale serve
 
 TODO
-working - not necessarily tested with all flags though:
-- tailscale up
-- tailscale down
-- tailscale login
-- tailscale logout
-- tailscale ping
-- tailscale set
-- tailscale serve
-- tailscale funnel (it didn't work on "the internet" - I could still only resolve the domain in the tailnet, but nothing from the snap should be causing that)
 
+### Tailscale funnel
+
+TODO
 
 ## Functionality affected by strict confinement
 
 This functionality works to some extend,
 but comes with some limitations due to strict confinement.
+
+### Tailscale login, up, and set
+
+This is about extra configuration flags to the following subcommands:
+
+- `tailscale login`
+- `tailscale up`
+- `tailscale set`
+
+All these subcommands accept many flags for configuring tailscaled,
+such as whether to accept DNS config from the admin panel,
+to use a custom control server,
+or to use a custom hostname.
+
+To see all the options supported:
+
+```bash
+lxc exec $TAILSCALE_VM_1 -- tailscale login -h
+lxc exec $TAILSCALE_VM_1 -- tailscale up -h
+lxc exec $TAILSCALE_VM_1 -- tailscale set -h
+```
+
+Due to the many possible combinations,
+testing these options is out of scope for this document.
+However, it is expected that almost all options will work correctly as expected in the strictly confined snap.
+The only known option that will not work,
+is `--ssh` (tailscaled ssh mode) - see the later section about Tailscale SSH.
 
 ### Tailscale file copying
 
