@@ -78,7 +78,7 @@ lxc exec $TAILSCALE_VM_1 -- tailscale netcheck
 
 Output example:
 
-```txt
+```text
 Report:
         * UDP: true
         * IPv4: yes, 61.245.148.199:38896
