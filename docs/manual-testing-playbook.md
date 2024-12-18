@@ -421,8 +421,10 @@ This verifies that the proxied service is indeed visible to the internet.
 Note: the [Tailscale funnel docs](https://tailscale.com/kb/1223/funnel#dns-propagation) state
 that you may need to wait up to 10 minutes for DNS records to propagate,
 before you can access the url.
-However, in testing, the domain could not be resolved even after waiting longer than the 10 minutes.
-The cause is to be confirmed.
+
+> [!WARNING]
+> In testing, the domain could not be resolved even after waiting longer than the 10 minutes.
+> The cause is to be confirmed.
 
 
 ## Functionality affected by strict confinement
