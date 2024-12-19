@@ -1,9 +1,16 @@
 # Manual testing playbook
 
-Document serves to describe the state of tailscale as packaged in the snap,
+This document serves to describe the state of tailscale as packaged in the snap,
 and to facilitate repeatable manual testing.
 
-## Prerequisites
+There are many shell code snippets in this document,
+designed for you to be able to copy and paste into your shell.
+Assuming the following prerequisites are met,
+you should be able to follow the document,
+running the snippets in order,
+to verify everything described here.
+
+### Prerequisites
 
 - LXD running on your local machine
 - enough resources on your local machine to launch two VMs
@@ -12,13 +19,11 @@ and to facilitate repeatable manual testing.
 
 ## Setup
 
-Global variables and settings (run this before anything else, configuring as desired):
+For help with debugging, it's recommended to `set -x` in the shell,
+so that the commands run are printed before they are executed:
 
 ```bash
 set -x
-TAILSCALE_VM_1="tailscale-1"
-TAILSCALE_VM_2="tailscale-2"
-TAILSCALE_SNAP_PATH=./tailscale_*_amd64.snap
 ```
 
 Launch the VMs.
@@ -26,17 +31,20 @@ Note: we use VMs here, because it's more complex to get tailscale working in a c
 See https://tailscale.com/kb/1130/lxc-unprivileged and https://tailscale.com/kb/1112/userspace-networking for more information.
 
 ```bash
-for vm in $TAILSCALE_VM_1 $TAILSCALE_VM_2; do
-  lxc launch ubuntu:jammy $TAILSCALE_VM_1 --vm -c limits.cpu=1 -c limits.memory=4GiB
-  lxc launch ubuntu:jammy $TAILSCALE_VM_2 --vm -c limits.cpu=1 -c limits.memory=4GiB
+for vm in tailscale-1 tailscale-2; do
+  lxc launch ubuntu:jammy tailscale-1 --vm -c limits.cpu=1 -c limits.memory=4GiB
+  lxc launch ubuntu:jammy tailscale-2 --vm -c limits.cpu=1 -c limits.memory=4GiB
 done
 ```
 
-When the lxd vm agent is running (wait a few seconds),
+Wait a few seconds for the LXD VM agent to be running,
 then push and install the snap:
 
 ```bash
-for vm in $TAILSCALE_VM_1 $TAILSCALE_VM_2; do
+# adjust path as needed
+TAILSCALE_SNAP_PATH=./tailscale_*_amd64.snap
+
+for vm in tailscale-1 tailscale-2; do
   lxc file push "$TAILSCALE_SNAP_PATH" "$vm/root/"
   lxc exec $vm -- sh -c 'snap install --dangerous ./tailscale_*.snap'
   lxc exec $vm -- snap connect tailscale:firewall-control
@@ -48,22 +56,24 @@ for vm in $TAILSCALE_VM_1 $TAILSCALE_VM_2; do
 done
 ```
 
-## Log in and bring up the tailnet
+### Bring up the tailnet
 
-Log in to your account on the tailscale network
-and bring the network up.
+Now that everything is installed,
+you can use `tailscale up` to bring up the network.
 This should not be affected by snap confinement;
 as in, it should work as in official docs.
+Note that this command will also prompt for authentication;
+when it does, please click the authentication link and confirm it.
 
 ```bash
-for vm in $TAILSCALE_VM_1 $TAILSCALE_VM_2; do
+for vm in tailscale-1 tailscale-2; do
   lxc exec $vm -- tailscale status
   lxc exec $vm -- tailscale up
   lxc exec $vm -- tailscale status
 done
 ```
 
-## Test functionality not affected by confinement
+## Functionality not affected by confinement
 
 None of these are affected by snap confinement,
 and should work as officially documented.
@@ -73,7 +83,7 @@ and should work as officially documented.
 Expect a report with network information and a list of derp server latencies.
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale netcheck
+lxc exec tailscale-1 -- tailscale netcheck
 ```
 
 Output example:
@@ -91,8 +101,8 @@ This should print the tailnet ips for the local machine.
 They should match the ips shown for the `tailscale0` interface from `ip -br a`.
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- ip -br a show tailscale0
-lxc exec $TAILSCALE_VM_1 -- tailscale ip
+lxc exec tailscale-1 -- ip -br a show tailscale0
+lxc exec tailscale-1 -- tailscale ip
 ```
 
 ### Tailscale version
@@ -101,7 +111,7 @@ Expect the output to be the same as the snap version (maybe with a trailing revi
 If not, then the snap packaged the wrong tailscale version.
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale version
+lxc exec tailscale-1 -- tailscale version
 ```
 
 Output example:
@@ -117,7 +127,7 @@ Output example:
 This simply prints a message about open source licenses and a link to more information.
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale licenses
+lxc exec tailscale-1 -- tailscale licenses
 ```
 
 Expected output:
@@ -137,7 +147,7 @@ You should see information about the target machine and Tailscale user.
 
 ```bash
 addr=100.126.120.25
-lxc exec $TAILSCALE_VM_1 -- tailscale whois $addr
+lxc exec tailscale-1 -- tailscale whois $addr
 ```
 
 Example output (redacted):
@@ -158,8 +168,8 @@ These should succeed,
 but they will probably list no exit nodes and no suggestions.
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale exit-node list
-lxc exec $TAILSCALE_VM_1 -- tailscale exit-node suggest
+lxc exec tailscale-1 -- tailscale exit-node list
+lxc exec tailscale-1 -- tailscale exit-node suggest
 ```
 
 Example output:
@@ -175,7 +185,7 @@ No exit node suggestion is available.
 This simply prints a unique identifier to use in bug reports.
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale bugreport
+lxc exec tailscale-1 -- tailscale bugreport
 ```
 
 Example expected output:
@@ -187,7 +197,7 @@ BUG-4db3f...
 ### Bash completion
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- bash
+lxc exec tailscale-1 -- bash
 
 # In the vm:
 
@@ -215,13 +225,13 @@ configure   ([ALPHA] Configure the host to enable more Tailscale features)
 In one terminal:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- python3 -m http.server
+lxc exec tailscale-1 -- python3 -m http.server
 ```
 
 And in another:
 
 ```bash
-lxc exec $TAILSCALE_VM_2 -- sh -c "printf 'GET /\n\n' | tailscale nc $TAILSCALE_VM_1 8000"
+lxc exec tailscale-2 -- sh -c "printf 'GET /\n\n' | tailscale nc tailscale-1 8000"
 ```
 
 You should see a log line from the python http server indicating a get request to `/`, with a `200` response.
@@ -233,7 +243,7 @@ Tailscale web runs a web server that you can use to control tailscaled.
 To test this, you can run this to start the server:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale web --listen 0.0.0.0:8088
+lxc exec tailscale-1 -- tailscale web --listen 0.0.0.0:8088
 ```
 
 Example output:
@@ -253,7 +263,7 @@ When finished, you can press `ctrl+c` in the terminal to interrupt and stop the 
 This provides a way to ping other machines on the tailnet:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale ping $TAILSCALE_VM_2
+lxc exec tailscale-1 -- tailscale ping tailscale-2
 ```
 
 Example output:
@@ -270,8 +280,8 @@ without re-authentication required.
 To test `tailscale down`:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale down
-lxc exec $TAILSCALE_VM_1 -- ip -br address show tailscale0
+lxc exec tailscale-1 -- tailscale down
+lxc exec tailscale-1 -- ip -br address show tailscale0
 ```
 
 Verify that the `ip -br address show` command shows either no addresses, or only an ipv6 link local address.
@@ -280,8 +290,8 @@ The machine is no longer connected to the tailnet.
 To test `tailscale up`:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale up
-lxc exec $TAILSCALE_VM_1 -- ip -br address show tailscale0
+lxc exec tailscale-1 -- tailscale up
+lxc exec tailscale-1 -- ip -br address show tailscale0
 ```
 
 Verify that the tailnet was brought up on the machine without any reauthentication required,
@@ -296,8 +306,8 @@ and requiring authentication and bringing the network back up when logging in.
 To test `tailscale logout`:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale logout
-lxc exec $TAILSCALE_VM_1 -- ip -br address show tailscale0
+lxc exec tailscale-1 -- tailscale logout
+lxc exec tailscale-1 -- ip -br address show tailscale0
 ```
 
 Verify that the `ip -br address show` command shows either no addresses, or only an ipv6 link local address.
@@ -306,7 +316,7 @@ The machine is no longer connected to the tailnet.
 To test `tailscale login`:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale login
+lxc exec tailscale-1 -- tailscale login
 ```
 
 You should see the authentication request - example output:
@@ -321,7 +331,7 @@ Click the link and authorise the login.
 Then you can check the network on the machine again:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- ip -br address show tailscale0
+lxc exec tailscale-1 -- ip -br address show tailscale0
 ```
 
 Verify that `ip -br address` above shows the tailnet addresses.
@@ -334,15 +344,15 @@ to expose it securely within the tailnet.
 To test this, run this example webserver in one terminal:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- mkdir tmp-server
-lxc exec $TAILSCALE_VM_1 -- touch tmp-server/test-file-1.txt
-lxc exec $TAILSCALE_VM_1 --cwd /root/tmp-server -- python3 -m http.server --bind 127.0.0.1 8000
+lxc exec tailscale-1 -- mkdir tmp-server
+lxc exec tailscale-1 -- touch tmp-server/test-file-1.txt
+lxc exec tailscale-1 --cwd /root/tmp-server -- python3 -m http.server --bind 127.0.0.1 8000
 ```
 
 And run the tailscale serve process in another terminal:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale serve 8000
+lxc exec tailscale-1 -- tailscale serve 8000
 ```
 
 Example output:
@@ -359,8 +369,8 @@ Press Ctrl+C to exit.
 And finally in a third terminal, test you can reach the server from the second VM:
 
 ```bash
-TAILNET_DOMAIN=$(lxc exec $TAILSCALE_VM_1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
-lxc exec $TAILSCALE_VM_2 -- curl https://$TAILSCALE_VM_1.$TAILNET_DOMAIN
+TAILNET_DOMAIN=$(lxc exec tailscale-1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
+lxc exec tailscale-2 -- curl https://tailscale-1.$TAILNET_DOMAIN
 ```
 
 Verify you see an HTML response of a directory listing including the `test-file-1.txt` created above.
@@ -376,15 +386,15 @@ to expose it securely to the public internet.
 To test this, run this example webserver in one terminal:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- mkdir tmp-server2
-lxc exec $TAILSCALE_VM_1 -- touch tmp-server2/test-file-2.txt
-lxc exec $TAILSCALE_VM_1 --cwd /root/tmp-server2 -- python3 -m http.server --bind 127.0.0.1 8000
+lxc exec tailscale-1 -- mkdir tmp-server2
+lxc exec tailscale-1 -- touch tmp-server2/test-file-2.txt
+lxc exec tailscale-1 --cwd /root/tmp-server2 -- python3 -m http.server --bind 127.0.0.1 8000
 ```
 
 And run the tailscale funnel process in another terminal:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale funnel 8000
+lxc exec tailscale-1 -- tailscale funnel 8000
 ```
 
 Example output:
@@ -448,9 +458,9 @@ or to use a custom hostname.
 To see all the options supported:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale login -h
-lxc exec $TAILSCALE_VM_1 -- tailscale up -h
-lxc exec $TAILSCALE_VM_1 -- tailscale set -h
+lxc exec tailscale-1 -- tailscale login -h
+lxc exec tailscale-1 -- tailscale up -h
+lxc exec tailscale-1 -- tailscale set -h
 ```
 
 Due to the many possible combinations,
@@ -475,18 +485,18 @@ See https://ubuntu.com/robotics/docs/snap-data-and-file-storage for more informa
 To test a successful case of file copying between hosts:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- sh -c "echo hello | tee snap/tailscale/common/greeting.txt"
-lxc exec $TAILSCALE_VM_1 -- tailscale file cp snap/tailscale/common/greeting.txt $TAILSCALE_VM_2:
+lxc exec tailscale-1 -- sh -c "echo hello | tee snap/tailscale/common/greeting.txt"
+lxc exec tailscale-1 -- tailscale file cp snap/tailscale/common/greeting.txt tailscale-2:
 
-lxc exec $TAILSCALE_VM_2 -- tailscale file get -conflict overwrite snap/tailscale/common/
-lxc exec $TAILSCALE_VM_2 -- cat snap/tailscale/common/greeting.txt  # expect "hello" output
+lxc exec tailscale-2 -- tailscale file get -conflict overwrite snap/tailscale/common/
+lxc exec tailscale-2 -- cat snap/tailscale/common/greeting.txt  # expect "hello" output
 ```
 
 To test a failure case - attempting to copy a file from a directory not readable by the Tailscale snap:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- sh -c "echo 'file in home dir' | tee home.txt"
-lxc exec $TAILSCALE_VM_1 -- tailscale file cp home.txt $TAILSCALE_VM_2:
+lxc exec tailscale-1 -- sh -c "echo 'file in home dir' | tee home.txt"
+lxc exec tailscale-1 -- tailscale file cp home.txt tailscale-2:
 ```
 
 The result should be `open home.txt: permission denied`.
@@ -499,8 +509,8 @@ Navigate to https://login.tailscale.com/admin/dns, scroll down to "HTTPS Certifi
 Now we can test the default case of requesting a certificate for the local machine (this is expected to fail):
 
 ```bash
-TAILNET_DOMAIN=$(lxc exec $TAILSCALE_VM_1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
-lxc exec $TAILSCALE_VM_1 -- tailscale cert $TAILSCALE_VM_1.$TAILNET_DOMAIN
+TAILNET_DOMAIN=$(lxc exec tailscale-1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
+lxc exec tailscale-1 -- tailscale cert tailscale-1.$TAILNET_DOMAIN
 ```
 
 Output:
@@ -511,7 +521,7 @@ This failure to create the cert file in the home directory is expected due to st
 To workaround this, you can either output the cert files to stdout (this command should succeed):
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale cert --cert-file - --key-file - $TAILSCALE_VM_1.$TAILNET_DOMAIN
+lxc exec tailscale-1 -- tailscale cert --cert-file - --key-file - tailscale-1.$TAILNET_DOMAIN
 ```
 
 Output example:
@@ -525,8 +535,8 @@ MIIDmjCCAyCgAwIBAgISA9asmzuogjk4Nz3...
 Or to a file within the directories accessible by the snap (this command should also succeed):
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale cert --cert-file ./snap/tailscale/common/cert.crt --key-file ./snap/tailscale/common/cert.key $TAILSCALE_VM_1.$TAILNET_DOMAIN
-lxc exec $TAILSCALE_VM_1 -- ls ./snap/tailscale/common/
+lxc exec tailscale-1 -- tailscale cert --cert-file ./snap/tailscale/common/cert.crt --key-file ./snap/tailscale/common/cert.key tailscale-1.$TAILNET_DOMAIN
+lxc exec tailscale-1 -- ls ./snap/tailscale/common/
 ```
 
 ## Functionality not working
@@ -541,13 +551,13 @@ Sharing a drive does not work (although the command appears to succeed).
 The drive management commands do work though: list, rename and unshare.
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- mkdir snap/tailscale/common/drive
-lxc exec $TAILSCALE_VM_1 -- tailscale drive share mydrive snap/tailscale/common/drive
-lxc exec $TAILSCALE_VM_1 -- tailscale drive list  # mydrive listed
-lxc exec $TAILSCALE_VM_1 -- tailscale drive rename mydrive mydrive2
-lxc exec $TAILSCALE_VM_1 -- tailscale drive list  # mydrive2 listed
-lxc exec $TAILSCALE_VM_1 -- tailscale drive unshare mydrive2
-lxc exec $TAILSCALE_VM_1 -- tailscale drive list  # no drives listed
+lxc exec tailscale-1 -- mkdir snap/tailscale/common/drive
+lxc exec tailscale-1 -- tailscale drive share mydrive snap/tailscale/common/drive
+lxc exec tailscale-1 -- tailscale drive list  # mydrive listed
+lxc exec tailscale-1 -- tailscale drive rename mydrive mydrive2
+lxc exec tailscale-1 -- tailscale drive list  # mydrive2 listed
+lxc exec tailscale-1 -- tailscale drive unshare mydrive2
+lxc exec tailscale-1 -- tailscale drive list  # no drives listed
 ```
 
 For an explanation of why sharing a drive doesn't work in the confined snap:
@@ -567,7 +577,7 @@ It also provides a `tailscale dns` subcommand that can be used to test the resol
 Check the status of the Tailscale DNS service on the host:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale dns status
+lxc exec tailscale-1 -- tailscale dns status
 ```
 
 With the default configuration, this should indicate that Tailscale DNS is enabled, and print information about MagicDNS, Tailscale FQDN (fully qualified domain name) of the machine, DNS routes, and search domains.
@@ -578,23 +588,23 @@ Now we can test resolving the Tailscale MagicDNS FQDN through the `tailscale dns
 as well as the system resolver.
 
 ```bash
-TAILNET_DOMAIN=$(lxc exec $TAILSCALE_VM_1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
-lxc exec $TAILSCALE_VM_1 -- tailscale dns query $TAILSCALE_VM_2.$TAILNET_DOMAIN a
-lxc exec $TAILSCALE_VM_1 -- dig $TAILSCALE_VM_2.$TAILNET_DOMAIN
+TAILNET_DOMAIN=$(lxc exec tailscale-1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
+lxc exec tailscale-1 -- tailscale dns query tailscale-2.$TAILNET_DOMAIN a
+lxc exec tailscale-1 -- dig tailscale-2.$TAILNET_DOMAIN
 ```
 
 Both of the above queries should return the same ipv4 address: the tailnet address of `TAILSCALE_VM_2`.
 Resolvectl should confirm the system DNS settings applied by tailscale:
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- resolvectl
+lxc exec tailscale-1 -- resolvectl
 ```
 
 Note that DNS queries for the bare machine name don't work (no result returned):
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale dns query $TAILSCALE_VM_2 a
-lxc exec $TAILSCALE_VM_1 -- dig $TAILSCALE_VM_2
+lxc exec tailscale-1 -- tailscale dns query tailscale-2 a
+lxc exec tailscale-1 -- dig tailscale-2
 ```
 
 This is unexpected, but does not appear to be related to snap confinement.
@@ -610,7 +620,7 @@ Tailscale includes a built in updater, which won't work because the snap files a
 The behaviour will look like this (if a newer version of Tailscale is available):
 
 ```bash
-lxc exec $TAILSCALE_VM_1 -- tailscale update --yes
+lxc exec tailscale-1 -- tailscale update --yes
 ```
 
 Output:
