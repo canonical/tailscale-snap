@@ -442,20 +442,19 @@ before you can access the url.
 This functionality works to some extend,
 but comes with some limitations due to strict confinement.
 
-### Tailscale login, up, and set
+### Tailscale configuration options
 
-This is about extra configuration flags to the following subcommands:
+Tailscale exposes some configuration options that can be managed
+through `tailscale` subcommands.
+For example, to use a custom control server,
+whether to accept DNS config from the control server,
+or to override the machine hostname.
 
-- `tailscale login`
-- `tailscale up`
-- `tailscale set`
+These options can be set at any time using `tailscale set` with the desired arguments.
+The options can also be set by passing extra arguments to `tailscale up` or `tailscale login`
+when initially bringing up the network or logging in.
 
-All these subcommands accept many flags for configuring tailscaled,
-such as whether to accept DNS config from the admin panel,
-to use a custom control server,
-or to use a custom hostname.
-
-To see all the options supported:
+To see all the options supported on the various subcommands:
 
 ```bash
 lxc exec tailscale-1 -- tailscale login -h
