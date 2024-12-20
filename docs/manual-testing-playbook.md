@@ -10,6 +10,8 @@ you should be able to follow the document,
 running the snippets in order,
 to verify everything described here.
 
+## Setup
+
 ### Prerequisites
 
 - LXD running on your local machine
@@ -17,7 +19,7 @@ to verify everything described here.
 - an account on https://tailscale.com
 - a local tailscale snap file (optional; you can also install from the snapstore)
 
-## Setup
+### Set up the environment
 
 For help with debugging, it's recommended to `set -x` in the shell,
 so that the commands run are printed before they are executed:
@@ -35,6 +37,8 @@ for vm in tailscale-1 tailscale-2; do
   lxc launch ubuntu:jammy $vm --vm -c limits.cpu=1 -c limits.memory=4GiB
 done
 ```
+
+### Install the Tailscale snap
 
 Wait a few seconds for the LXD VM agent to be running,
 then you can install the snap.
