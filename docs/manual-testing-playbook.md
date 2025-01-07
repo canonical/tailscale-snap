@@ -10,6 +10,13 @@ you should be able to follow the document,
 running the snippets in order,
 to verify everything described here.
 
+> [!WARNING]
+> Be careful which account and tailnet you use for testing.
+> The test instructions include adding machines
+> and changing tailnet settings which may impact functionality or security compliance.
+> It's not recommended to run this testing on a production tailnet.
+
+
 ## Setup
 
 ### Prerequisites
