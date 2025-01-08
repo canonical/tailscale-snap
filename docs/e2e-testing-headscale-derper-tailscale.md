@@ -4,55 +4,32 @@
 
 ## Environment setup
 
-TODO: clean this section up
+For this testing, we'll use VMs on Azure.
+This ensures we can test scenarios that are close to real world,
+with public IP addresses and DNS names for Headscale and Derper.
 
-Azure
+This document deploys everything in the `australiaeast` region;
+if you deploy in another region, substitute the name accordingly in domain names.
 
-in `australiaeast` region.
+We'll deploy 4 VMs:
 
-VM1
-- name: headscale
-- ubuntu 24.04
-- x64
-- DS1_v2 (1 cpu, 3.5G memory)
-- username: ubuntu
-- add your ssh public key
-- allow inbound ports:
-  - 22 (ssh)
-  - 80 (for letsencrypt challenge when headscale generates certs)
-  - 443 (for headscale)
+| name (same DNS name) | full domain name                             | inbound rules                                                                                           | outbound rules |
+|----------------------|----------------------------------------------|---------------------------------------------------------------------------------------------------------|----------------|
+| headscale            | headscale.australiaeast.cloudapp.azure.com   | - TCP 22 (ssh)<br>- TCP 80 (letsencrypt challenge)<br>- TCP 443 (headscale)                             | None           |
+| derper               | derper.australiaeast.cloudapp.azure.com      | - TCP 22 (ssh)<br>- TCP 80 (derper)<br>- TCP 443 (derper)<br>- UDP 3478 (derper STUN)<br>- ICMP traffic | - ICMP traffic |
+| tailscale-1          | tailscale-1.australiaeast.cloudapp.azure.com | - TCP 22 (ssh)                                                                                          | None           |
+| tailscale-2          | tailscale-2.australiaeast.cloudapp.azure.com | - TCP 22 (ssh)                                                                                          | None           |
 
-After deployment, navigate to the headscale VM and add a dns name (`headscale`). This will make the VM accessible via `headscale.australiaeast.cloudapp.azure.com`.
+Each VM should also have the following configuration:
 
-VM2
-- name: derper
-- ubuntu 24.04
-- x64
-- DS1_v2 (1 cpu, 3.5G memory)
-- username: ubuntu
-- add your ssh public key
-- allow inbound ports (see https://tailscale.com/kb/1118/custom-derp-servers#required-ports ):
-  - TCP 22 (ssh)
-  - UDP 3478 (for derper stun port)
-  - TCP 443 (for derper https listen address)
-  - TCP 80 (for derper http listen address)
-  - inbound and outbound ICMP traffic
+- OS: Ubuntu 24.04 LTS
+- Architecture: x64
+- Size: `DS1_v2` (1 CPU, 3.5GB RAM)
+- Username: `ubuntu`
+- SSH key: a public SSH key of your choosing; you'll need ssh access to all VMs
 
-NOTE: azure web UI wouldn't let me create a rule for ICMP type traffic (it ignored that I'd checked ICMPv4), so I just opened it up to accept any protocol on any port inbound and outbound for now...
-
-VM3
-- name: tailscale-1
-- ubuntu 24.04
-- x64
-- DS1_v2 (1 cpu, 3.5G memory)
-- username: ubuntu
-- add your ssh public key
-- allow inbound ports:
-  - 22 (ssh)
-
-After deployment, navigate to the tailscale-1 VM and add a dns name (`tailscale-1`). This will make the VM accessible via `tailscale-1.australiaeast.cloudapp.azure.com`.
-
-Create another VM identical to the above, but name it `tailscale-2`, and use `tailscale-2` for the dns name.
+Most config can be set at VM creation time using the web UI.
+The DNS name can only be set after the VM is created though.
 
 ## Setup
 
