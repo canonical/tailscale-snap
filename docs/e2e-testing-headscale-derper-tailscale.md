@@ -365,7 +365,4 @@ This verifies that the Headscale dns service and search domain is configured as 
 
 ---
 
-TODO: test more things
-- connectivity between the tailscale machines
-- connectivity between the tailscale machines with custom policies to headscale
-- connectivity when relayed through the derp server
+TODO: test more things - see internal test plan doc
