@@ -15,7 +15,7 @@ provider "azurerm" {
 }
 
 variable "ssh_key" {
-  type = string
+  type        = string
   description = "public ssh key to be added to all created VMs (for the 'ubuntu' user)"
 }
 
@@ -133,7 +133,7 @@ resource "azurerm_network_interface" "derper" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.vnet_subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id = azurerm_public_ip.derper.id
+    public_ip_address_id          = azurerm_public_ip.derper.id
   }
 }
 
@@ -178,7 +178,7 @@ resource "azurerm_linux_virtual_machine" "derper" {
 
 output "derper_vm_access" {
   description = "SSH access info for the derper VM"
-  value = "ssh ${resource.azurerm_linux_virtual_machine.derper.admin_username}@${resource.azurerm_public_ip.derper.fqdn}"
+  value       = "ssh ${resource.azurerm_linux_virtual_machine.derper.admin_username}@${resource.azurerm_public_ip.derper.fqdn}"
 }
 
 resource "azurerm_public_ip" "headscale" {
@@ -240,7 +240,7 @@ resource "azurerm_network_interface" "headscale" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.vnet_subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id = azurerm_public_ip.headscale.id
+    public_ip_address_id          = azurerm_public_ip.headscale.id
   }
 }
 
@@ -279,7 +279,7 @@ resource "azurerm_linux_virtual_machine" "headscale" {
 
 output "headscale_vm_access" {
   description = "SSH access info for the headscale VM"
-  value = "ssh ${resource.azurerm_linux_virtual_machine.headscale.admin_username}@${resource.azurerm_public_ip.headscale.fqdn}"
+  value       = "ssh ${resource.azurerm_linux_virtual_machine.headscale.admin_username}@${resource.azurerm_public_ip.headscale.fqdn}"
 }
 
 resource "azurerm_network_security_group" "tailscale" {
@@ -317,7 +317,7 @@ resource "azurerm_network_interface" "tailscale_1" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.vnet_subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id = azurerm_public_ip.tailscale_1.id
+    public_ip_address_id          = azurerm_public_ip.tailscale_1.id
   }
 }
 
@@ -356,7 +356,7 @@ resource "azurerm_linux_virtual_machine" "tailscale_1" {
 
 output "tailscale_1_vm_access" {
   description = "SSH access info for the tailscale-1 VM"
-  value = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_1.admin_username}@${resource.azurerm_public_ip.tailscale_1.fqdn}"
+  value       = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_1.admin_username}@${resource.azurerm_public_ip.tailscale_1.fqdn}"
 }
 
 resource "azurerm_public_ip" "tailscale_2" {
@@ -376,7 +376,7 @@ resource "azurerm_network_interface" "tailscale_2" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.vnet_subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id = azurerm_public_ip.tailscale_2.id
+    public_ip_address_id          = azurerm_public_ip.tailscale_2.id
   }
 }
 
@@ -415,7 +415,7 @@ resource "azurerm_linux_virtual_machine" "tailscale_2" {
 
 output "tailscale_2_vm_access" {
   description = "SSH access info for the tailscale-2 VM"
-  value = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_2.admin_username}@${resource.azurerm_public_ip.tailscale_2.fqdn}"
+  value       = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_2.admin_username}@${resource.azurerm_public_ip.tailscale_2.fqdn}"
 }
 
 resource "azurerm_public_ip" "tailscale_3" {
@@ -435,7 +435,7 @@ resource "azurerm_network_interface" "tailscale_3" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.vnet_subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id = azurerm_public_ip.tailscale_3.id
+    public_ip_address_id          = azurerm_public_ip.tailscale_3.id
   }
 }
 
@@ -474,5 +474,5 @@ resource "azurerm_linux_virtual_machine" "tailscale_3" {
 
 output "tailscale_3_vm_access" {
   description = "SSH access info for the tailscale-3 VM"
-  value = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_3.admin_username}@${resource.azurerm_public_ip.tailscale_3.fqdn}"
+  value       = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_3.admin_username}@${resource.azurerm_public_ip.tailscale_3.fqdn}"
 }
