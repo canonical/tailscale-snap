@@ -270,8 +270,10 @@ Navigate to this url to continue authentication.
 The webpage should display a command to run on the Headscale server to authenticate the machine.
 The text on the page should look something like:
 
-> **Machine registration**
+> ## Machine registration
+>
 > Run the command below in the headscale server to add this machine to your network:
+>
 > ```text
 > headscale nodes register --user USERNAME --key mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
 > ```
