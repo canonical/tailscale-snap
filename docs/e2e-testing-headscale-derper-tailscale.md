@@ -33,7 +33,7 @@ terraform apply -var "ssh_key=YOUR PUBLIC SSH KEY CONTENTS"
 
 ### Manually
 
-We'll deploy 4 VMs:
+We'll deploy 5 VMs:
 
 | name (same DNS name) | full domain name                             | inbound rules                                                                                           | outbound rules |
 |----------------------|----------------------------------------------|---------------------------------------------------------------------------------------------------------|----------------|
@@ -41,6 +41,7 @@ We'll deploy 4 VMs:
 | derper               | derper.australiaeast.cloudapp.azure.com      | - TCP 22 (ssh)<br>- TCP 80 (derper)<br>- TCP 443 (derper)<br>- UDP 3478 (derper STUN)<br>- ICMP traffic | - ICMP traffic |
 | tailscale-1          | tailscale-1.australiaeast.cloudapp.azure.com | - TCP 22 (ssh)                                                                                          | None           |
 | tailscale-2          | tailscale-2.australiaeast.cloudapp.azure.com | - TCP 22 (ssh)                                                                                          | None           |
+| tailscale-3          | tailscale-3.australiaeast.cloudapp.azure.com | - TCP 22 (ssh)                                                                                          | None           |
 
 Each VM should also have the following configuration:
 
@@ -61,11 +62,11 @@ A simple diagram of how the services are connected:
 
 ```text
 Headscale -----> Derper
-     ^
-     |
-     +---------+
-     |         |
-Tailscale-1   Tailscale-2
+  ^
+  |
+  +------------+------------+
+  |            |            |
+Tailscale-1  Tailscale-2  Tailscale-3
 ```
 
 ### Derper
@@ -178,20 +179,24 @@ GLOBALEOF
 
 ```
 
-Create an initial user (tailnet) for testing:
+Create two initial users for testing:
 
 ```bash
-ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale users create test1
+ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale users create user1
+ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale users create user2
 ```
+
+We'll register nodes tailscale-1 and tailscale-2 to user1,
+and tailscale-3 to user2.
 
 ### Tailscale
 
 #### Tailscale-1
 
-On tailscale-1, install Tailscale and authenticate to the Headscale server using a preauth key:
+On tailscale-1, install Tailscale and authenticate to the Headscale server using a preauth key and user `user1`:
 
 ```bash
-KEY="$(ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale preauthkeys create --user test1)"
+KEY="$(ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale preauthkeys create --user user1)"
 ssh tailscale-1.australiaeast.cloudapp.azure.com -- <<EOF
 set -x
 sudo snap install --edge tailscale
@@ -202,14 +207,14 @@ EOF
 
 ```
 
-Verify that the output of `tailscale status` shows an ip address and the `test1` tailnet.
+Verify that the output of `tailscale status` shows an ip address and the `user1` tailnet.
 Also verify that the DERP map printed only displays a single entry: the derper we set up earlier.
 
 Expected output:
 
 ```text
 + tailscale status
-100.64.0.1      tailscale-1          test1        linux   -
+100.64.0.1      tailscale-1          user1        linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -250,12 +255,12 @@ The text on the page should look something like:
 > headscale nodes register --user USERNAME --key mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
 > ```
 
-Replace `USERNAME` with the Headscale username you wish to use (here it's `test1`),
+Replace `USERNAME` with the `user1` Headscale user,
 then run it on the Headscale server VM.
 Note that the long key displayed here is an example only; use the one actually displayed by the commnad.
 
 ```bash
-ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale nodes register --user test1 --key mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
+ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale nodes register --user user1 --key mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
 ```
 
 This command should output:
@@ -292,8 +297,41 @@ Expected output:
 
 ```text
 + tailscale status
-100.64.0.2      tailscale-2          test1        linux   -
-100.64.0.1      tailscale-1          test1        linux   -
+100.64.0.2      tailscale-2          user1        linux   -
+100.64.0.1      tailscale-1          user1        linux   -
++ tailscale debug derp-map
+{
+        "Regions": {
+                                        "HostName": "derper.australiaeast.cloudapp.azure.com"
+... some lines omitted, but should only be one region
+```
+
+
+#### Tailscale-3
+
+On tailscale-3, install Tailscale and authenticate to the Headscale server using a preauth key with the `user2` user:
+
+```bash
+KEY="$(ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale preauthkeys create --user user2)"
+ssh tailscale-3.australiaeast.cloudapp.azure.com -- <<EOF
+set -x
+sudo snap install --edge tailscale
+sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
+tailscale status
+tailscale debug derp-map
+EOF
+
+```
+
+Verify that the output of `tailscale status` shows an ip address and the `user2` tailnet for `tailscale-3`.
+
+Expected output:
+
+```text
++ tailscale status
+100.64.0.3      tailscale-3          user2        linux   -
+100.64.0.2      tailscale-2          user1        linux   -
+100.64.0.1      tailscale-1          user1        linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -331,5 +369,3 @@ TODO: test more things
 - connectivity between the tailscale machines
 - connectivity between the tailscale machines with custom policies to headscale
 - connectivity when relayed through the derp server
-
-- maybe we want a third tailscale node, signed in with a different headscale user? This would allow testing more scenarios and policies

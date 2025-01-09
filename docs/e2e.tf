@@ -418,4 +418,61 @@ output "tailscale_2_vm_access" {
   value = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_2.admin_username}@${resource.azurerm_public_ip.tailscale_2.fqdn}"
 }
 
-## TODO: can I use lxd provider here too for a local tailscale vm?
+resource "azurerm_public_ip" "tailscale_3" {
+  name                = "tailscale_3"
+  domain_name_label   = "tailscale-3"
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+  location            = azurerm_resource_group.tailscale_testing.location
+  allocation_method   = "Static"
+}
+
+resource "azurerm_network_interface" "tailscale_3" {
+  name                = "tailscale-3-nic"
+  location            = azurerm_resource_group.tailscale_testing.location
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.vnet_subnet.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id = azurerm_public_ip.tailscale_3.id
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "tailscale_3" {
+  network_interface_id      = azurerm_network_interface.tailscale_3.id
+  network_security_group_id = azurerm_network_security_group.tailscale.id
+}
+
+resource "azurerm_linux_virtual_machine" "tailscale_3" {
+  name                = "tailscale-3"
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+  location            = azurerm_resource_group.tailscale_testing.location
+  size                = "Standard_DS1_v2"
+  admin_username      = "ubuntu"
+  network_interface_ids = [
+    azurerm_network_interface.tailscale_3.id,
+  ]
+
+  admin_ssh_key {
+    username   = "ubuntu"
+    public_key = var.ssh_key
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
+    version   = "latest"
+  }
+}
+
+output "tailscale_3_vm_access" {
+  description = "SSH access info for the tailscale-3 VM"
+  value = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_3.admin_username}@${resource.azurerm_public_ip.tailscale_3.fqdn}"
+}
