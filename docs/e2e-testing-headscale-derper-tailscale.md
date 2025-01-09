@@ -58,12 +58,14 @@ The DNS name can only be set after the VM is created though.
 
 In this step, we will install all the required software, and configure them together.
 
+A simple diagram of how the services are connected:
+
 ```text
 Headscale -----> Derper
+     ^
      |
      +---------+
      |         |
-     v         v
 Tailscale-1   Tailscale-2
 ```
 
@@ -212,6 +214,8 @@ ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale users create te
 
 ### Tailscale
 
+#### Tailscale-1
+
 On tailscale-1, install Tailscale and authenticate to the Headscale server using a preauth key:
 
 ```bash
@@ -228,6 +232,20 @@ EOF
 
 Verify that the output of `tailscale status` shows an ip address and the `test1` tailnet.
 Also verify that the DERP map printed only displays a single entry: the derper we set up earlier.
+
+Expected output:
+
+```text
++ tailscale status
+100.64.0.1      tailscale-1          test1        linux   -
++ tailscale debug derp-map
+{
+        "Regions": {
+                                        "HostName": "derper.australiaeast.cloudapp.azure.com"
+... some lines omitted, but should only be one region
+```
+
+#### Tailscale-2
 
 On tailscale-2, install Tailscale and authenticate to the Headscale server using the default interactive login flow:
 
@@ -307,18 +325,6 @@ Expected output:
         "Regions": {
                                         "HostName": "derper.australiaeast.cloudapp.azure.com"
 ... some lines omitted, but should only be one region
-```
-
-
----
-
-```bash
-lxc launch ubuntu:24.04 tailscale-3 --vm -c limits.cpu=1 -c limits.memory=4GiB
-lxc exec tailscale-3 -- snap install --edge tailscale
-KEY="$(ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale preauthkeys create --user test1)"
-lxc exec tailscale-3 -- sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com:443 --authkey "$KEY"
-lxc exec tailscale-3 -- tailscale status
-lxc exec tailscale-3 -- tailscale debug derp-map
 ```
 
 
