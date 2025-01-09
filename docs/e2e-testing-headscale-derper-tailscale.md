@@ -1,8 +1,7 @@
+# End to end testing: Tailscale, Headscale, Derper
 
-# End to end testing: tailscale, headscale, derper
 
-
-## Environment setup
+## Deploy environment
 
 For this testing, we'll use VMs on Azure.
 This ensures we can test scenarios that are close to real world,
@@ -54,7 +53,7 @@ Each VM should also have the following configuration:
 Most config can be set at VM creation time using the web UI.
 The DNS name can only be set after the VM is created though.
 
-## Setup
+## Configure services
 
 In this step, we will install all the required software, and configure them together.
 
@@ -68,7 +67,6 @@ Headscale -----> Derper
      |         |
 Tailscale-1   Tailscale-2
 ```
-
 
 ### Derper
 
@@ -103,7 +101,6 @@ listen_addr: "0.0.0.0:443"
 # Address to listen to /metrics
 metrics_listen_addr: "127.0.0.1:9090"
 grpc_listen_addr: "127.0.0.1:50443"
-grpc_allow_insecure: false
 noise:
   private_key_path: "/var/snap/headscale/common/internal/noise_private.key"
 # List of IP prefixes to allocate tailaddresses from.
@@ -111,19 +108,10 @@ prefixes:
   v6: "fd7a:115c:a1e0::/48"
   v4: "100.64.0.0/10"
   allocation: sequential
-
 derp:
   server:
     enabled: false
-    region_id: 999
-    region_code: "headscale"
-    region_name: "Headscale Embedded DERP"
-    stun_listen_addr: "0.0.0.0:3478"
-    private_key_path: "/var/snap/headscale/common/internal/derp_server_private.key"
-    automatically_add_embedded_derp_region: true
-    ipv4: 1.2.3.4
-    ipv6: 2001:db8::1
-  urls: [] #- https://controlplane.tailscale.com/derpmap/default
+  urls: [] # default: https://controlplane.tailscale.com/derpmap/default
   paths:
     - "/var/snap/headscale/common/derp.yaml"
   auto_update_enabled: true
@@ -147,8 +135,6 @@ tls_letsencrypt_hostname: "headscale.australiaeast.cloudapp.azure.com"
 tls_letsencrypt_cache_dir: "/var/snap/headscale/common/internal/cache"
 tls_letsencrypt_challenge_type: HTTP-01
 tls_letsencrypt_listen: ":http"
-tls_cert_path: ""
-tls_key_path: ""
 log:
   format: text
   level: trace
@@ -157,7 +143,7 @@ policy:
   path: ""
 dns:
   magic_dns: true
-  base_domain: example.com
+  base_domain: tailnet.internal
   nameservers:
     global:
       - 1.1.1.1
@@ -171,21 +157,6 @@ dns:
   use_username_in_magic_dns: false
 unix_socket: "/var/snap/headscale/common/internal/headscale.sock"
 unix_socket_permission: "0770"
-oidc:
-  only_start_if_oidc_is_available: true
-  issuer: ""
-  client_id: ""
-  client_secret: ""
-  expiry: "180d"
-  use_expiry_from_token: false
-  scope: ["openid","profile","email"]
-  allowed_domains: []
-  allowed_groups: []
-  allowed_users: []
-  strip_email_domain: true
-logtail:
-  enabled: false
-randomize_client_port: false
 EOF
 
 sudo tee /var/snap/headscale/common/derp.yaml <<EOF
@@ -193,7 +164,7 @@ regions:
   900:
     regionid: 900
     regioncode: "one"
-    regionname: "my first region"
+    regionname: "Custom Region One"
     nodes:
       - name: "1"
         regionid: 900
@@ -204,6 +175,7 @@ sudo snap restart headscale
 sleep 2
 sudo snap logs headscale
 GLOBALEOF
+
 ```
 
 Create an initial user (tailnet) for testing:
@@ -329,6 +301,8 @@ Expected output:
 ... some lines omitted, but should only be one region
 ```
 
+
+## Test things
 
 TODO: now that the environment is set up and connected, test some more things - some ideas:
 - connectivity between the tailscale machines
