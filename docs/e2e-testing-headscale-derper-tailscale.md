@@ -12,7 +12,7 @@ if you deploy in another region, substitute the name accordingly in domain names
 
 ### Terraform
 
-There is a terraform module at ./e2e.tf that will deploy the environment.
+There is a terraform module at [./e2e.tf](./e2e.tf) that will deploy the environment.
 
 There are multiple ways to authenticate, but one way is to ensure the `az` command (azure cli) is installed and authenticated.
 See https://learn.microsoft.com/en-gb/cli/azure/get-started-with-azure-cli for more information.
@@ -302,9 +302,34 @@ Expected output:
 ```
 
 
-## Test things
+## Testing
 
-TODO: now that the environment is set up and connected, test some more things - some ideas:
+### MagicDNS
+
+Verify that the Headscale MagicDNS is working:
+
+```bash
+ssh tailscale-1.australiaeast.cloudapp.azure.com -- resolvectl query --cache no --legen no tailscale-2.tailnet.internal
+ssh tailscale-1.australiaeast.cloudapp.azure.com -- resolvectl query --cache no --legen no tailscale-2
+```
+
+Both should return the same ip address (within the tailnet subnet).
+Expected output:
+
+```text
+tailscale-2.tailnet.internal: 100.64.0.2                    -- link: tailscale0
+
+tailscale-2: 100.64.0.2                                     -- link: tailscale0
+             (tailscale-2.tailnet.internal)
+```
+
+This verifies that the Headscale dns service and search domain is configured as expected.
+
+---
+
+TODO: test more things
 - connectivity between the tailscale machines
 - connectivity between the tailscale machines with custom policies to headscale
 - connectivity when relayed through the derp server
+
+- maybe we want a third tailscale node, signed in with a different headscale user? This would allow testing more scenarios and policies
