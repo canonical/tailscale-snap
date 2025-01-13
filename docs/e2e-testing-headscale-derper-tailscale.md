@@ -15,7 +15,7 @@ There is a provided Terraform module to deploy the environment,
 or you can deploy it manually.
 Both options are documented below:
 
-### Terraform
+### Deploy with Terraform
 
 There is a Terraform module at [./e2e.tf](./e2e.tf) that will deploy the environment.
 
@@ -36,7 +36,7 @@ Then you can apply through Terraform, providing required variables:
 terraform apply -var "ssh_key=YOUR PUBLIC SSH KEY CONTENTS"
 ```
 
-### Manually
+### Deploy manually
 
 If you aren't using Terraform, you can deploy the machines manually following the information below.
 
@@ -76,7 +76,7 @@ Headscale -----> Derper
 Tailscale-1  Tailscale-2  Tailscale-3
 ```
 
-### Derper
+### Configure Derper
 
 ```bash
 ssh derper.australiaeast.cloudapp.azure.com -- <<'EOF'
@@ -92,7 +92,7 @@ EOF
 Once this is done, you should be able to visit https://derper.australiaeast.cloudapp.azure.com/ in your browser,
 and see a generic public info page about the Tailscale DERP server.
 
-### Headscale
+### Configure Headscale
 
 ```bash
 ssh headscale.australiaeast.cloudapp.azure.com -- <<'GLOBALEOF'
@@ -196,9 +196,9 @@ ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale users create us
 We'll register nodes tailscale-1 and tailscale-2 to user1,
 and tailscale-3 to user2.
 
-### Tailscale
+### Configure Tailscale
 
-#### Tailscale-1
+#### Configure machine tailscale-1
 
 On tailscale-1, install Tailscale and authenticate to the Headscale server using a preauth key and user `user1`:
 
@@ -229,7 +229,7 @@ Expected output:
 ... some lines omitted, but should only be one region
 ```
 
-#### Tailscale-2
+#### Configure machine tailscale-2
 
 On tailscale-2, install Tailscale and authenticate to the Headscale server using the default interactive login flow:
 
@@ -314,7 +314,7 @@ Expected output:
 ```
 
 
-#### Tailscale-3
+#### Configure machine tailscale-3
 
 On tailscale-3, install Tailscale and authenticate to the Headscale server using a preauth key with the `user2` user:
 
