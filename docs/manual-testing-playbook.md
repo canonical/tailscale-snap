@@ -859,6 +859,46 @@ pong from tailscale-2 (100.110.164.126) via 10.177.175.233:51104 in 1ms
 pong from tailscale-1 (100.125.133.64) via 10.177.175.146:35839 in 1ms
 ```
 
+### Tailscale dns
+
+Tailscale manages the system DNS by default (it can be turned off via `tailscale set --accept-dns=false`).
+It also provides a `tailscale dns` subcommand that can be used to test the resolver and view the status.
+
+Check the status of the Tailscale DNS service on the host:
+
+```bash
+lxc exec tailscale-1 -- tailscale dns status
+```
+
+With the default configuration, this should indicate that Tailscale DNS is enabled, and print information about MagicDNS, Tailscale FQDN (fully qualified domain name) of the machine, DNS routes, and search domains.
+You may see a note about "reading the system DNS configuration is not supported on this platform";
+this does not appear to be related to snap confinement, merely a system limitation.
+
+Now you can test resolving the Tailscale MagicDNS FQDN through the `tailscale dns query` subcommand,
+as well as the system resolver.
+
+```bash
+TAILNET_DOMAIN=$(lxc exec tailscale-1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
+lxc exec tailscale-1 -- tailscale dns query tailscale-2.$TAILNET_DOMAIN a
+lxc exec tailscale-1 -- dig tailscale-2.$TAILNET_DOMAIN
+```
+
+Both of the above queries should return the same ipv4 address: the tailnet address of `TAILSCALE_VM_2`.
+Resolvectl should confirm the system DNS settings applied by tailscale:
+
+```bash
+lxc exec tailscale-1 -- resolvectl
+```
+
+Note that DNS queries for the bare machine name don't work (no result returned):
+
+```bash
+lxc exec tailscale-1 -- tailscale dns query tailscale-2 a
+lxc exec tailscale-1 -- dig tailscale-2
+```
+
+This is unexpected, but does not appear to be related to snap confinement.
+
 ## Functionality impacted by strict confinement
 
 This functionality works,
@@ -1081,46 +1121,6 @@ Tailscaled in the snap is running as root, without access to su.
 So the su check fails, and the check for running as non-root user also fails.
 This is regardless of file paths and file permissions.
 You can see the error messages in the tailscaled logs (`snap logs tailscale`).
-
-### Tailscale dns
-
-Tailscale manages the system DNS by default (it can be turned off via `tailscale set --accept-dns=false`).
-It also provides a `tailscale dns` subcommand that can be used to test the resolver and view the status.
-
-Check the status of the Tailscale DNS service on the host:
-
-```bash
-lxc exec tailscale-1 -- tailscale dns status
-```
-
-With the default configuration, this should indicate that Tailscale DNS is enabled, and print information about MagicDNS, Tailscale FQDN (fully qualified domain name) of the machine, DNS routes, and search domains.
-You may see a note about "reading the system DNS configuration is not supported on this platform";
-this does not appear to be related to snap confinement, merely a system limitation.
-
-Now you can test resolving the Tailscale MagicDNS FQDN through the `tailscale dns query` subcommand,
-as well as the system resolver.
-
-```bash
-TAILNET_DOMAIN=$(lxc exec tailscale-1 -- sh -c "tailscale dns status | awk 'match(\$0, /\w+\.ts\.net/) {print substr(\$0, RSTART, RLENGTH); exit}'")
-lxc exec tailscale-1 -- tailscale dns query tailscale-2.$TAILNET_DOMAIN a
-lxc exec tailscale-1 -- dig tailscale-2.$TAILNET_DOMAIN
-```
-
-Both of the above queries should return the same ipv4 address: the tailnet address of `TAILSCALE_VM_2`.
-Resolvectl should confirm the system DNS settings applied by tailscale:
-
-```bash
-lxc exec tailscale-1 -- resolvectl
-```
-
-Note that DNS queries for the bare machine name don't work (no result returned):
-
-```bash
-lxc exec tailscale-1 -- tailscale dns query tailscale-2 a
-lxc exec tailscale-1 -- dig tailscale-2
-```
-
-This is unexpected, but does not appear to be related to snap confinement.
 
 ### Tailscale SSH
 
