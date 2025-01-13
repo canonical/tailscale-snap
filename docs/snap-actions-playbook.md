@@ -59,6 +59,15 @@ $ sudo snap refresh tailscale
 tailscale ... refreshed
 ```
 
-This process will auto-restart the Tailscale service.
+The Tailscale service will *not* automatically restart;
+the previous revision will continue to run.
+Restarting the Tailscale service may result in interrupted network connections.
 
-Be aware that restarting the Tailscale service may result in interrupted connections.
+When you are ready, you can restart the Tailscale service,
+so that it will be now running the new revision:
+
+```console
+$ sudo snap restart tailscale
+Restarted.
+```
+
