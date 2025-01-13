@@ -10,9 +10,14 @@ with public IP addresses and DNS names for Headscale and Derper.
 This document deploys everything in the `australiaeast` region;
 if you deploy in another region, substitute the name accordingly in domain names where referenced.
 
+
+There is a provided Terraform module to deploy the environment,
+or you can deploy it manually.
+Both options are documented below:
+
 ### Terraform
 
-There is a terraform module at [./e2e.tf](./e2e.tf) that will deploy the environment.
+There is a Terraform module at [./e2e.tf](./e2e.tf) that will deploy the environment.
 
 There are multiple ways to authenticate, but one way is to ensure the `az` command (azure cli) is installed and authenticated.
 See https://learn.microsoft.com/en-gb/cli/azure/get-started-with-azure-cli for more information.
@@ -25,13 +30,15 @@ Example:
 export ARM_SUBSCRIPTION_ID=466ee356-ce1f-11ef-bf94-db2a042e145c
 ```
 
-Then you can apply the terraform, providing required variables:
+Then you can apply through Terraform, providing required variables:
 
 ```bash
 terraform apply -var "ssh_key=YOUR PUBLIC SSH KEY CONTENTS"
 ```
 
 ### Manually
+
+If you aren't using Terraform, you can deploy the machines manually following the information below.
 
 We'll deploy 5 VMs:
 
