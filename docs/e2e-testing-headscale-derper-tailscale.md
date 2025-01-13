@@ -71,9 +71,14 @@ A simple diagram of how the services are connected:
 Headscale -----> Derper
   ^
   |
-  +------------+------------+
-  |            |            |
-Tailscale-1  Tailscale-2  Tailscale-3
+  +------------+
+  |            |
+Internal-1   Internal-2
+  ^            ^
+  |            |
+  +------------+
+  |            |
+Jumpbox-1    Jumpbox-2
 ```
 
 ### Configure Derper

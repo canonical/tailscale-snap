@@ -31,11 +31,25 @@ resource "azurerm_virtual_network" "vnet" {
   resource_group_name = azurerm_resource_group.tailscale_testing.name
 }
 
-resource "azurerm_subnet" "vnet_subnet" {
-  name                 = "tailscale-vnet_subnet"
+resource "azurerm_virtual_network" "vnet2" {
+  name                = "tailscale-vnet2"
+  address_space       = ["10.1.0.0/16"]
+  location            = azurerm_resource_group.tailscale_testing.location
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+}
+
+resource "azurerm_subnet" "vnet_subnet_1" {
+  name                 = "tailscale-vnet_subnet_1"
   resource_group_name  = azurerm_resource_group.tailscale_testing.name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = ["10.0.1.0/24"]
+}
+
+resource "azurerm_subnet" "vnet_subnet_2" {
+  name                 = "tailscale-vnet_subnet_2"
+  resource_group_name  = azurerm_resource_group.tailscale_testing.name
+  virtual_network_name = azurerm_virtual_network.vnet2.name
+  address_prefixes     = ["10.1.2.0/24"]
 }
 
 resource "azurerm_public_ip" "derper" {
@@ -131,7 +145,7 @@ resource "azurerm_network_interface" "derper" {
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.vnet_subnet.id
+    subnet_id                     = azurerm_subnet.vnet_subnet_1.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.derper.id
   }
@@ -169,16 +183,6 @@ resource "azurerm_linux_virtual_machine" "derper" {
     sku       = "server"
     version   = "latest"
   }
-}
-
-# output "derper_public_ip" {
-#   description = "derper VM public ip"
-#   value = resource.azurerm_linux_virtual_machine.derper.public_ip_address
-# }
-
-output "derper_vm_access" {
-  description = "SSH access info for the derper VM"
-  value       = "ssh ${resource.azurerm_linux_virtual_machine.derper.admin_username}@${resource.azurerm_public_ip.derper.fqdn}"
 }
 
 resource "azurerm_public_ip" "headscale" {
@@ -238,7 +242,7 @@ resource "azurerm_network_interface" "headscale" {
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.vnet_subnet.id
+    subnet_id                     = azurerm_subnet.vnet_subnet_1.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.headscale.id
   }
@@ -277,13 +281,8 @@ resource "azurerm_linux_virtual_machine" "headscale" {
   }
 }
 
-output "headscale_vm_access" {
-  description = "SSH access info for the headscale VM"
-  value       = "ssh ${resource.azurerm_linux_virtual_machine.headscale.admin_username}@${resource.azurerm_public_ip.headscale.fqdn}"
-}
-
-resource "azurerm_network_security_group" "tailscale" {
-  name                = "tailscale-nsg"
+resource "azurerm_network_security_group" "ssh_only" {
+  name                = "ssh_only-nsg"
   location            = azurerm_resource_group.tailscale_testing.location
   resource_group_name = azurerm_resource_group.tailscale_testing.name
 
@@ -300,40 +299,64 @@ resource "azurerm_network_security_group" "tailscale" {
   }
 }
 
-resource "azurerm_public_ip" "tailscale_1" {
-  name                = "tailscale_1"
-  domain_name_label   = "tailscale-1"
+resource "azurerm_public_ip" "tailscale_jumpbox_1" {
+  name                = "tailscale_jumpbox_1"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
   allocation_method   = "Static"
 }
 
-resource "azurerm_network_interface" "tailscale_1" {
-  name                = "tailscale-1-nic"
+resource "azurerm_public_ip" "tailscale_jumpbox_2" {
+  name                = "tailscale_jumpbox_2"
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+  location            = azurerm_resource_group.tailscale_testing.location
+  allocation_method   = "Static"
+}
+
+resource "azurerm_network_interface" "tailscale_jumpbox_1" {
+  name                = "tailscale-jumpbox-nic-1"
   location            = azurerm_resource_group.tailscale_testing.location
   resource_group_name = azurerm_resource_group.tailscale_testing.name
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.vnet_subnet.id
+    subnet_id                     = azurerm_subnet.vnet_subnet_1.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.tailscale_1.id
+    public_ip_address_id          = azurerm_public_ip.tailscale_jumpbox_1.id
   }
 }
 
-resource "azurerm_network_interface_security_group_association" "tailscale_1" {
-  network_interface_id      = azurerm_network_interface.tailscale_1.id
-  network_security_group_id = azurerm_network_security_group.tailscale.id
+resource "azurerm_network_interface" "tailscale_jumpbox_2" {
+  name                = "tailscale-jumpbox-nic-2"
+  location            = azurerm_resource_group.tailscale_testing.location
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.vnet_subnet_2.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.tailscale_jumpbox_2.id
+  }
 }
 
-resource "azurerm_linux_virtual_machine" "tailscale_1" {
-  name                = "tailscale-1"
+resource "azurerm_network_interface_security_group_association" "tailscale_jumpbox_1" {
+  network_interface_id      = azurerm_network_interface.tailscale_jumpbox_1.id
+  network_security_group_id = azurerm_network_security_group.ssh_only.id
+}
+
+resource "azurerm_network_interface_security_group_association" "tailscale_jumpbox_2" {
+  network_interface_id      = azurerm_network_interface.tailscale_jumpbox_2.id
+  network_security_group_id = azurerm_network_security_group.ssh_only.id
+}
+
+resource "azurerm_linux_virtual_machine" "tailscale_jumpbox_1" {
+  name                = "tailscale-jumpbox-1"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
   size                = "Standard_DS1_v2"
   admin_username      = "ubuntu"
   network_interface_ids = [
-    azurerm_network_interface.tailscale_1.id,
+    azurerm_network_interface.tailscale_jumpbox_1.id,
   ]
 
   admin_ssh_key {
@@ -354,45 +377,15 @@ resource "azurerm_linux_virtual_machine" "tailscale_1" {
   }
 }
 
-output "tailscale_1_vm_access" {
-  description = "SSH access info for the tailscale-1 VM"
-  value       = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_1.admin_username}@${resource.azurerm_public_ip.tailscale_1.fqdn}"
-}
 
-resource "azurerm_public_ip" "tailscale_2" {
-  name                = "tailscale_2"
-  domain_name_label   = "tailscale-2"
-  resource_group_name = azurerm_resource_group.tailscale_testing.name
-  location            = azurerm_resource_group.tailscale_testing.location
-  allocation_method   = "Static"
-}
-
-resource "azurerm_network_interface" "tailscale_2" {
-  name                = "tailscale-2-nic"
-  location            = azurerm_resource_group.tailscale_testing.location
-  resource_group_name = azurerm_resource_group.tailscale_testing.name
-
-  ip_configuration {
-    name                          = "internal"
-    subnet_id                     = azurerm_subnet.vnet_subnet.id
-    private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.tailscale_2.id
-  }
-}
-
-resource "azurerm_network_interface_security_group_association" "tailscale_2" {
-  network_interface_id      = azurerm_network_interface.tailscale_2.id
-  network_security_group_id = azurerm_network_security_group.tailscale.id
-}
-
-resource "azurerm_linux_virtual_machine" "tailscale_2" {
-  name                = "tailscale-2"
+resource "azurerm_linux_virtual_machine" "tailscale_jumpbox_2" {
+  name                = "tailscale-jumpbox-2"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
   size                = "Standard_DS1_v2"
   admin_username      = "ubuntu"
   network_interface_ids = [
-    azurerm_network_interface.tailscale_2.id,
+    azurerm_network_interface.tailscale_jumpbox_2.id,
   ]
 
   admin_ssh_key {
@@ -413,45 +406,31 @@ resource "azurerm_linux_virtual_machine" "tailscale_2" {
   }
 }
 
-output "tailscale_2_vm_access" {
-  description = "SSH access info for the tailscale-2 VM"
-  value       = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_2.admin_username}@${resource.azurerm_public_ip.tailscale_2.fqdn}"
-}
-
-resource "azurerm_public_ip" "tailscale_3" {
-  name                = "tailscale_3"
-  domain_name_label   = "tailscale-3"
-  resource_group_name = azurerm_resource_group.tailscale_testing.name
-  location            = azurerm_resource_group.tailscale_testing.location
-  allocation_method   = "Static"
-}
-
-resource "azurerm_network_interface" "tailscale_3" {
-  name                = "tailscale-3-nic"
+resource "azurerm_network_interface" "internal_1" {
+  name                = "internal-1-nic"
   location            = azurerm_resource_group.tailscale_testing.location
   resource_group_name = azurerm_resource_group.tailscale_testing.name
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.vnet_subnet.id
+    subnet_id                     = azurerm_subnet.vnet_subnet_1.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.tailscale_3.id
   }
 }
 
-resource "azurerm_network_interface_security_group_association" "tailscale_3" {
-  network_interface_id      = azurerm_network_interface.tailscale_3.id
-  network_security_group_id = azurerm_network_security_group.tailscale.id
+resource "azurerm_network_interface_security_group_association" "internal_1" {
+  network_interface_id      = azurerm_network_interface.internal_1.id
+  network_security_group_id = azurerm_network_security_group.ssh_only.id
 }
 
-resource "azurerm_linux_virtual_machine" "tailscale_3" {
-  name                = "tailscale-3"
+resource "azurerm_linux_virtual_machine" "internal_1" {
+  name                = "internal-1"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
   size                = "Standard_DS1_v2"
   admin_username      = "ubuntu"
   network_interface_ids = [
-    azurerm_network_interface.tailscale_3.id,
+    azurerm_network_interface.internal_1.id,
   ]
 
   admin_ssh_key {
@@ -472,7 +451,78 @@ resource "azurerm_linux_virtual_machine" "tailscale_3" {
   }
 }
 
-output "tailscale_3_vm_access" {
-  description = "SSH access info for the tailscale-3 VM"
-  value       = "ssh ${resource.azurerm_linux_virtual_machine.tailscale_3.admin_username}@${resource.azurerm_public_ip.tailscale_3.fqdn}"
+resource "azurerm_network_interface" "internal_2" {
+  name                = "internal-2-nic"
+  location            = azurerm_resource_group.tailscale_testing.location
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.vnet_subnet_2.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "internal_2" {
+  network_interface_id      = azurerm_network_interface.internal_2.id
+  network_security_group_id = azurerm_network_security_group.ssh_only.id
+}
+
+resource "azurerm_linux_virtual_machine" "internal_2" {
+  name                = "internal-2"
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+  location            = azurerm_resource_group.tailscale_testing.location
+  size                = "Standard_DS1_v2"
+  admin_username      = "ubuntu"
+  network_interface_ids = [
+    azurerm_network_interface.internal_2.id,
+  ]
+
+  admin_ssh_key {
+    username   = "ubuntu"
+    public_key = var.ssh_key
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
+    version   = "latest"
+  }
+}
+
+output "ssh_config" {
+  description = "SSH config snippet for access to the machines"
+  value       = <<-EOT
+  Host tailscale-etet-headscale
+    Hostname ${resource.azurerm_public_ip.headscale.fqdn}
+    User ${resource.azurerm_linux_virtual_machine.headscale.admin_username}
+
+  Host tailscale-etet-derper
+    Hostname ${resource.azurerm_public_ip.derper.fqdn}
+    User ${resource.azurerm_linux_virtual_machine.derper.admin_username}
+
+  Host tailscale-etet-jumpbox-1
+    Hostname ${resource.azurerm_linux_virtual_machine.tailscale_jumpbox_1.public_ip_address}
+    User ${resource.azurerm_linux_virtual_machine.tailscale_jumpbox_1.admin_username}
+
+  Host tailscale-etet-jumpbox-2
+    Hostname ${resource.azurerm_linux_virtual_machine.tailscale_jumpbox_2.public_ip_address}
+    User ${resource.azurerm_linux_virtual_machine.tailscale_jumpbox_2.admin_username}
+
+  Host tailscale-etet-internal-1
+    ProxyJump tailscale-etet-jumpbox-1
+    Hostname ${resource.azurerm_linux_virtual_machine.internal_1.private_ip_address}
+    User ${resource.azurerm_linux_virtual_machine.internal_1.admin_username}
+
+  Host tailscale-etet-internal-2
+    ProxyJump tailscale-etet-jumpbox-2
+    Hostname ${resource.azurerm_linux_virtual_machine.internal_2.private_ip_address}
+    User ${resource.azurerm_linux_virtual_machine.internal_2.admin_username}
+  EOT
 }
