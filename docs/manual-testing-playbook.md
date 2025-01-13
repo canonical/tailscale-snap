@@ -217,6 +217,70 @@ Example expected output:
 BUG-4db3f...
 ```
 
+
+### Tailscale syspolicy
+
+The `tailscale syspolicy <...>` subcommands are related to how Tailscale can be customized with system policies.
+See https://tailscale.com/kb/1080/cli#syspolicy and https://tailscale.com/kb/1315/mdm-keys for more information.
+
+```bash
+tailscale syspolicy list
+```
+
+With the default policies, this command will output something like this:
+
+```text
+No policy settings
+```
+
+This command is expected to show information about system policies if any are set, and any errors relating to them on the local machine.
+
+The system policies can also be manually reapplied to the local machine by running:
+
+```bash
+tailscale syspolicy reload
+```
+
+Again, with the default policies, the command will simply output:
+
+```text
+No policy settings
+```
+
+### Tailscale metrics
+
+Tailscale provides metrics; to view them, run:
+
+```bash
+tailscale metrics
+```
+
+The output should look like Prometheus metrics:
+
+```text
+$ tailscale metrics
+# TYPE tailscaled_advertised_routes gauge
+# HELP tailscaled_advertised_routes Number of advertised network routes (e.g. by a subnet router)
+tailscaled_advertised_routes 0
+...
+# TYPE tailscaled_outbound_packets_total counter
+# HELP tailscaled_outbound_packets_total Counts the number of packets sent to other peers
+tailscaled_outbound_packets_total{path="derp"} 888
+tailscaled_outbound_packets_total{path="direct_ipv4"} 0
+tailscaled_outbound_packets_total{path="direct_ipv6"} 0
+```
+
+To check the validity of the metrics, you can use `promtool` ([promtool](https://prometheus.io/docs/prometheus/latest/command-line/promtool/) is a command line tool for debugging and developing for Prometheus monitoring):
+
+```bash
+sudo apt install -y prometheus
+tailscale metrics | promtool check metrics
+```
+
+On success, there should be no output, and a zero exit code from `promtool`.
+
+
+
 ### Bash completion
 
 ```bash
@@ -934,6 +998,98 @@ Or to a file within the directories accessible by the snap (this command should 
 ```bash
 lxc exec tailscale-1 -- tailscale cert --cert-file ./snap/tailscale/common/cert.crt --key-file ./snap/tailscale/common/cert.key tailscale-1.$TAILNET_DOMAIN
 lxc exec tailscale-1 -- ls ./snap/tailscale/common/
+```
+
+### Debug subcommands
+
+Tailscale also provides several subcommands for debugging.
+Note that these commands are not publicly documented, and not guaranteed to be stable.
+
+```text
+$ tailscale debug --help
+Debug commands
+
+USAGE
+  tailscale debug <debug-flags | subcommand>
+
+"tailscale debug" contains misc debug facilities; it is not a stable interface.
+
+SUBCOMMANDS
+  derp-map               Print DERP map
+  component-logs         Enable/disable debug logs for a component
+  daemon-goroutines      Print tailscaled's goroutines
+  daemon-logs            Watch tailscaled's server logs
+  metrics                Print tailscaled's metrics
+  env                    Print cmd/tailscale environment
+  stat                   Stat a file
+  hostinfo               Print hostinfo
+  local-creds            Print how to access Tailscale LocalAPI
+  restun                 Force a magicsock restun
+  rebind                 Force a magicsock rebind
+  derp-set-on-demand     Enable DERP on-demand mode (breaks reachability)
+  derp-unset-on-demand   Disable DERP on-demand mode
+  break-tcp-conns        Break any open TCP connections from the daemon
+  break-derp-conns       Break any open DERP connections from the daemon
+  pick-new-derp          Switch to some other random DERP home region for a short time
+  force-prefer-derp      Prefer the given region ID if reachable (until restart, or 0 to clear)
+  force-netmap-update    Force a full no-op netmap update (for load testing)
+  reload-config          Reload config
+  control-knobs          See current control knobs
+  prefs                  Print prefs
+  watch-ipn              Subscribe to IPN message bus
+  netmap                 Print the current network map
+  via                    Convert between site-specific IPv4 CIDRs and IPv6 'via' routes
+  ts2021                 Debug ts2021 protocol connectivity
+  set-expire             Manipulate node key expiry for testing
+  dev-store-set          Set a key/value pair during development
+  derp                   Test a DERP configuration
+  capture                Streams pcaps for debugging
+  portmap                Run portmap debugging
+  peer-endpoint-changes  Prints debug information about a peer's endpoint changes
+  dial-types             Prints debug information about connecting to a given host or IP
+  resolve                Does a DNS lookup
+  go-buildinfo           Prints Go's runtime/debug.BuildInfo
+
+FLAGS
+  --cpu-profile string
+        if non-empty, grab a CPU profile for --profile-seconds seconds and write it to this file; - for stdout
+  --file string
+        get, delete:NAME, or NAME
+  --mem-profile string
+        if non-empty, grab a memory profile and write it to this file; - for stdout
+  --profile-seconds int
+        number of seconds to run a CPU profile for, when --cpu-profile is non-empty (default 15)
+```
+
+Most of these commands simply print debug information, and are expected to work fine in the snap.
+Some are designed to make changes for debugging, and have not been extensively tested.
+Some output to a file (eg. `--cpu-profile <file>`) - these have the standard restrictions on file locations for strictly confined snaps (see https://snapcraft.io/docs/data-locations).
+
+Some have issues however:
+
+#### tailscale debug local-creds
+
+`tailscale debug local-creds` advertises an incorrect path to the control socket:
+
+```text
+$ tailscale debug local-creds
+curl --unix-socket /var/run/tailscale/tailscaled.sock http://local-tailscaled.sock/localapi/v0/status
+```
+
+Since this is running from the snap, with a custom socket path provided, the curl command should actually be:
+
+```bash
+curl --unix-socket /var/snap/tailscale/common/socket/tailscaled.sock http://local-tailscaled.sock/localapi/v0/status
+```
+
+#### tailscale debug capture
+
+This will not work, due to the strictly confined environment not including wireshark.
+Tailscale will not be able to access wireshark, even if wireshark is installed on the system:
+
+```text
+$ sudo tailscale debug capture
+exec: "wireshark": executable file not found in $PATH
 ```
 
 ## Functionality not supported in strict confinement
