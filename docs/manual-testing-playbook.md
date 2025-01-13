@@ -270,7 +270,7 @@ tailscaled_outbound_packets_total{path="direct_ipv4"} 0
 tailscaled_outbound_packets_total{path="direct_ipv6"} 0
 ```
 
-To check the validity of the metrics, you can use `promtool`:
+To check the validity of the metrics, you can use `promtool` ([promtool](https://prometheus.io/docs/prometheus/latest/command-line/promtool/) is a command line tool for debugging and developing for Prometheus monitoring):
 
 ```bash
 sudo apt install -y prometheus
