@@ -33,33 +33,13 @@ export ARM_SUBSCRIPTION_ID=466ee356-ce1f-11ef-bf94-db2a042e145c
 Then you can apply through Terraform, providing required variables:
 
 ```bash
+cd docs
 terraform apply -var "ssh_key=YOUR PUBLIC SSH KEY CONTENTS"
 ```
 
-### Deploy manually
-
-If you aren't using Terraform, you can deploy the machines manually following the information below.
-
-We'll deploy 5 VMs:
-
-| name (same DNS name) | full domain name                             | inbound rules                                                                                           | outbound rules |
-|----------------------|----------------------------------------------|---------------------------------------------------------------------------------------------------------|----------------|
-| headscale            | headscale.australiaeast.cloudapp.azure.com   | - TCP 22 (ssh)<br>- TCP 80 (letsencrypt challenge)<br>- TCP 443 (headscale)                             | None           |
-| derper               | derper.australiaeast.cloudapp.azure.com      | - TCP 22 (ssh)<br>- TCP 80 (derper)<br>- TCP 443 (derper)<br>- UDP 3478 (derper STUN)<br>- ICMP traffic | - ICMP traffic |
-| tailscale-1          | tailscale-1.australiaeast.cloudapp.azure.com | - TCP 22 (ssh)                                                                                          | None           |
-| tailscale-2          | tailscale-2.australiaeast.cloudapp.azure.com | - TCP 22 (ssh)                                                                                          | None           |
-| tailscale-3          | tailscale-3.australiaeast.cloudapp.azure.com | - TCP 22 (ssh)                                                                                          | None           |
-
-Each VM should also have the following configuration:
-
-- OS: Ubuntu 24.04 LTS
-- Architecture: x64
-- Size: `DS1_v2` (1 CPU, 3.5GB RAM)
-- Username: `ubuntu`
-- SSH key: a public SSH key of your choosing; you'll need ssh access to all VMs
-
-Most config can be set at VM creation time using the web UI.
-The DNS name can only be set after the VM is created though.
+Terraform will output an ssh config snippet,
+with the configuration required to be able to ssh to the machines.
+Please copy this to your ssh config in order to connect to the machines for the rest of the steps.
 
 ## Configure services
 
@@ -68,7 +48,7 @@ In this step, we will install all the required software, and configure them toge
 A simple diagram of how the services are connected:
 
 ```text
-Headscale -----> Derper
+Headscale -----> Derper [Tailscale also running]
   ^
   |
   +------------+
@@ -81,10 +61,13 @@ Internal-1   Internal-2
 Jumpbox-1    Jumpbox-2
 ```
 
+All machines have a public ip address, except for Internal-1 and Internal-2.
+Internal-1 and Internal-2 are on separate networks, and cannot reach each other normally (without tailscale).
+
 ### Configure Derper
 
 ```bash
-ssh derper.australiaeast.cloudapp.azure.com -- <<'EOF'
+ssh tailscale-etet-derper -- <<'EOF'
 set -x
 sudo snap install --edge derper
 sudo snap set derper hostname=derper.australiaeast.cloudapp.azure.com
@@ -100,12 +83,9 @@ and see a generic public info page about the Tailscale DERP server.
 ### Configure Headscale
 
 ```bash
-ssh headscale.australiaeast.cloudapp.azure.com -- <<'GLOBALEOF'
+ssh tailscale-etet-headscale -- <<'GLOBALEOF'
 set -x
-#sudo snap install --edge headscale
-# for this testing, I've used a locally built headscale snap, from the branch at https://github.com/canonical/headscale-snap/pull/12
-# rsynced to the machine.
-sudo snap install --dangerous ./headscale_0.23.0_amd64.snap
+sudo snap install --edge headscale
 
 sudo tee /var/snap/headscale/common/config.yaml <<'EOF'
 ---
@@ -172,7 +152,7 @@ unix_socket: "/var/snap/headscale/common/internal/headscale.sock"
 unix_socket_permission: "0770"
 EOF
 
-sudo tee /var/snap/headscale/common/derp.yaml <<EOF
+sudo tee /var/snap/headscale/common/derp.yaml <<'EOF'
 regions:
   900:
     regionid: 900
@@ -194,22 +174,26 @@ GLOBALEOF
 Create two initial users for testing:
 
 ```bash
-ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale users create user1
-ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale users create user2
+ssh tailscale-etet-headscale -- <<'EOF'
+set -x
+sudo headscale users create user1
+sudo headscale users create user2
+EOF
+
 ```
 
-We'll register nodes tailscale-1 and tailscale-2 to user1,
-and tailscale-3 to user2.
+We'll register Tailscale nodes internal-1 and internal-2 to user1,
+and Tailscale on the derper node to user2.
 
 ### Configure Tailscale
 
-#### Configure machine tailscale-1
+#### Configure Tailscale on machine internal-1
 
-On tailscale-1, install Tailscale and authenticate to the Headscale server using a preauth key and user `user1`:
+On internal-1, install Tailscale and authenticate to the Headscale server using a preauth key and user `user1`:
 
 ```bash
-KEY="$(ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale preauthkeys create --user user1)"
-ssh tailscale-1.australiaeast.cloudapp.azure.com -- <<EOF
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user user1)"
+ssh tailscale-etet-internal-1 -- <<EOF
 set -x
 sudo snap install --edge tailscale
 sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
@@ -219,14 +203,14 @@ EOF
 
 ```
 
-Verify that the output of `tailscale status` shows an ip address and the `user1` tailnet.
-Also verify that the DERP map printed only displays a single entry: the derper we set up earlier.
+Verify that the output of `tailscale status` above shows an ip address and the `user1` tailnet.
+Also verify that the DERP map printed only displays a single entry: the derper server we set up earlier.
 
 Expected output:
 
 ```text
 + tailscale status
-100.64.0.1      tailscale-1          user1        linux   -
+100.64.0.1      internal-1          user1        linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -234,12 +218,12 @@ Expected output:
 ... some lines omitted, but should only be one region
 ```
 
-#### Configure machine tailscale-2
+#### Configure Tailscale on machine internal-2
 
-On tailscale-2, install Tailscale and authenticate to the Headscale server using the default interactive login flow:
+On internal-2, install Tailscale and authenticate to the Headscale server using the default interactive login flow:
 
 ```bash
-ssh tailscale-2.australiaeast.cloudapp.azure.com -- <<EOF
+ssh tailscale-etet-internal-2 -- <<'EOF'
 set -x
 sudo snap install --edge tailscale
 sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com
@@ -248,7 +232,7 @@ EOF
 ```
 
 The last command should print a long url on the Headscale server domain,
-and wait (it will not exit until authentication is complete.
+and wait (it will not exit until authentication is complete).
 The url should look something like:
 
 ```text
@@ -272,14 +256,14 @@ then run it on the Headscale server VM.
 Note that the long key displayed here is an example only; use the one actually displayed by the commnad.
 
 ```bash
-ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale nodes register --user user1 --key mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
+ssh tailscale-etet-headscale -- sudo headscale nodes register --user user1 --key mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
 ```
 
 This command should output:
 
 ```text
 ... [debug logs]
-Node tailscale-2 registered
+Node internal-2 registered
 ```
 
 And the previous `tailscale up ...` command should exit with a success message:
@@ -294,10 +278,10 @@ To authenticate, visit:
 Success.
 ```
 
-Now we can double check that Tailscale 2 is now connected to the tailnet and also has the same DERP map configuration:
+Now we can double check that internal-2 is now connected to the tailnet and also has the same DERP map configuration:
 
 ```bash
-ssh tailscale-2.australiaeast.cloudapp.azure.com -- <<EOF
+ssh tailscale-etet-internal-2 -- <<'EOF'
 set -x
 tailscale status
 tailscale debug derp-map
@@ -309,8 +293,8 @@ Expected output:
 
 ```text
 + tailscale status
-100.64.0.2      tailscale-2          user1        linux   -
-100.64.0.1      tailscale-1          user1        linux   -
+100.64.0.2      internal-2          user1        linux   -
+100.64.0.1      internal-1          user1        linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -319,13 +303,13 @@ Expected output:
 ```
 
 
-#### Configure machine tailscale-3
+#### Configure Tailscale on machine derper
 
-On tailscale-3, install Tailscale and authenticate to the Headscale server using a preauth key with the `user2` user:
+On derper, install Tailscale and authenticate to the Headscale server using a preauth key with the `user2` user:
 
 ```bash
-KEY="$(ssh headscale.australiaeast.cloudapp.azure.com -- sudo headscale preauthkeys create --user user2)"
-ssh tailscale-3.australiaeast.cloudapp.azure.com -- <<EOF
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user user2)"
+ssh tailscale-etet-derper -- <<EOF
 set -x
 sudo snap install --edge tailscale
 sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
@@ -335,15 +319,15 @@ EOF
 
 ```
 
-Verify that the output of `tailscale status` shows an ip address and the `user2` tailnet for `tailscale-3`.
+Verify that the output of `tailscale status` shows an ip address and the `user2` tailnet for `derper`.
 
 Expected output:
 
 ```text
 + tailscale status
-100.64.0.3      tailscale-3          user2        linux   -
-100.64.0.2      tailscale-2          user1        linux   -
-100.64.0.1      tailscale-1          user1        linux   -
+100.64.0.3      derper              user2        linux   -
+100.64.0.2      internal-2          user1        linux   -
+100.64.0.1      internal-1          user1        linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -359,8 +343,8 @@ Expected output:
 Verify that the Headscale MagicDNS is working:
 
 ```bash
-ssh tailscale-1.australiaeast.cloudapp.azure.com -- resolvectl query --cache no --legen no tailscale-2.tailnet.internal
-ssh tailscale-1.australiaeast.cloudapp.azure.com -- resolvectl query --cache no --legen no tailscale-2
+ssh tailscale-etet-internal-1 -- resolvectl query --cache no --legen no internal-2.tailnet.internal
+ssh tailscale-etet-internal-1 -- resolvectl query --cache no --legen no internal-2
 ```
 
 Both should return the same ip address (within the tailnet subnet).
