@@ -422,16 +422,26 @@ ssh tailscale-etet-internal-1 -- sudo tailscale up
 ssh tailscale-etet-internal-2 -- sudo tailscale up
 ```
 
-Attempt to SSH from internal-1 to internal-2, via the internal-2 hostname:
+Attempt to SSH all combinations of machines:
 
 ```bash
-ssh tailscale-etet-internal-1 -- ssh -o StrictHostKeyChecking=no internal-2 -- hostname
+ssh tailscale-etet-internal-1 -- $'ssh -o StrictHostKeyChecking=no internal-2 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-internal-1 -- $'ssh -o StrictHostKeyChecking=no derper     -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-internal-2 -- $'ssh -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-internal-2 -- $'ssh -o StrictHostKeyChecking=no derper     -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-derper     -- $'ssh -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-derper     -- $'ssh -o StrictHostKeyChecking=no internal-2 -- echo $(hostname) to \'$(hostname)\''
 ```
 
-This should succeed, and the output should be the result of running `hostname` on internal-2:
+All should succeed, and the expected output should be:
 
 ```text
-internal-2
+internal-1 to internal-2
+internal-1 to derper
+internal-2 to internal-1
+internal-2 to derper
+derper to internal-1
+derper to internal-2
 ```
 
 Check the status of Tailscale:
@@ -477,5 +487,152 @@ Report:
 ```
 
 TODO: figure out what firewall rules to set to force traffic through DERP, so we can test ssh'ing to a machine through the relayed connection
+
+### Test custom policies
+
+```bash
+ssh tailscale-etet-headscale -- <<'GLOBALEOF'
+sudo tee /var/snap/headscale/common/config.yaml <<'EOF'
+---
+server_url: "https://headscale.australiaeast.cloudapp.azure.com"
+listen_addr: "0.0.0.0:443"
+# Address to listen to /metrics
+metrics_listen_addr: "127.0.0.1:9090"
+grpc_listen_addr: "127.0.0.1:50443"
+noise:
+  private_key_path: "/var/snap/headscale/common/internal/noise_private.key"
+# List of IP prefixes to allocate tailaddresses from.
+prefixes:
+  v6: "fd7a:115c:a1e0::/48"
+  v4: "100.64.0.0/10"
+  allocation: sequential
+derp:
+  server:
+    enabled: false
+  urls: [] # default: https://controlplane.tailscale.com/derpmap/default
+  paths:
+    - "/var/snap/headscale/common/derp.yaml"
+  auto_update_enabled: true
+  update_frequency: 24h
+disable_check_updates: true
+ephemeral_node_inactivity_timeout: 30m
+database:
+  type: sqlite
+  debug: false
+  gorm:
+    prepare_stmt: true
+    parameterized_queries: true
+    skip_err_record_not_found: true
+    slow_threshold: 1000
+  sqlite:
+    path: "/var/snap/headscale/common/internal/db.sqlite"
+    write_ahead_log: true
+acme_url: https://acme-v02.api.letsencrypt.org/directory
+acme_email: ""
+tls_letsencrypt_hostname: "headscale.australiaeast.cloudapp.azure.com"
+tls_letsencrypt_cache_dir: "/var/snap/headscale/common/internal/cache"
+tls_letsencrypt_challenge_type: HTTP-01
+tls_letsencrypt_listen: ":http"
+log:
+  format: text
+  level: trace
+policy:
+  mode: file
+  path: "/var/snap/headscale/common/policies.hujson"
+dns:
+  magic_dns: true
+  base_domain: tailnet.internal
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001
+    split:
+      {}
+  search_domains: []
+  extra_records: []
+  use_username_in_magic_dns: false
+unix_socket: "/var/snap/headscale/common/internal/headscale.sock"
+unix_socket_permission: "0770"
+EOF
+
+sudo tee /var/snap/headscale/common/derp.yaml <<'EOF'
+regions:
+  900:
+    regionid: 900
+    regioncode: "one"
+    regionname: "Custom Region One"
+    nodes:
+      - name: "1"
+        regionid: 900
+        hostname: "derper.australiaeast.cloudapp.azure.com"
+EOF
+
+sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
+{
+  "groups": {
+    "group:one": ["user1"],
+    "group:two": ["user2"],
+  },
+  "tagOwners": {
+    "tag:tagone": ["group:one"],
+    "tag:tagtwo": ["group:two"],
+  },
+  "acls": [
+    // group two can access all servers
+    {
+      "action": "accept",
+      "src": ["group:two"],
+      "dst": [
+        "*:*",
+      ]
+    },
+
+    // but group one can only access group one servers
+    {
+      "action": "accept",
+      "src": ["group:one"],
+      "dst": [
+        "group:one:*",
+      ]
+    },
+
+    // all users can ping all servers though
+    {
+      "action": "accept",
+      "src": ["*"],
+      "proto": "icmp",
+      "dst": [
+        "*:*",
+      ]
+    },
+  ]
+}
+EOF
+
+sudo snap restart headscale
+sleep 2
+sudo snap logs headscale
+GLOBALEOF
+
+```
+
+Attempt to SSH all combinations of machines:
+
+```bash
+#ssh tailscale-etet-internal-1 -- tailscale status
+ssh tailscale-etet-internal-1 -- $'ssh -o StrictHostKeyChecking=no internal-2 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-internal-1 -- $'ssh -o StrictHostKeyChecking=no derper     -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-internal-2 -- $'ssh -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-internal-2 -- $'ssh -o StrictHostKeyChecking=no derper     -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-internal-2 -- tailscale ping derper
+ssh tailscale-etet-internal-2 -- ping derper
+ssh tailscale-etet-internal-2 -- tailscale status
+ssh tailscale-etet-derper     -- $'ssh -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-derper     -- $'ssh -o StrictHostKeyChecking=no internal-2 -- echo $(hostname) to \'$(hostname)\''
+```
+
+TODO: the above doesn't appear to work - internal-2 can still reach derper, but it shouldn't be able to
 
 TODO: test more things - see internal test plan doc
