@@ -338,7 +338,7 @@ Expected output:
 
 ## Testing
 
-### MagicDNS
+### Test MagicDNS
 
 Verify that the Headscale MagicDNS is working:
 
@@ -359,6 +359,123 @@ tailscale-2: 100.64.0.2                                     -- link: tailscale0
 
 This verifies that the Headscale dns service and search domain is configured as expected.
 
----
+### Test tailnet connectivity between internal-1 and internal-2
+
+This is to verify that Tailscale is indeed providing a new connectivity path.
+
+#### Setup
+
+First, create and distribute an SSH key across the machines running Tailscale,
+so we can test SSH over the tailnet.
+
+```bash
+ssh-keygen -f tailscale-etet-id.key -t ed25519 -N '' -C ubuntu@tailscale-etet-internal
+for HOST in tailscale-etet-{internal-{1,2},derper}; do
+  echo $HOST
+  rsync tailscale-etet-id.key $HOST:.ssh/id_ed25519
+  ssh $HOST -- tee -a .ssh/authorized_keys < tailscale-etet-id.key.pub
+done
+```
+
+#### SSH without Tailscale
+
+Take down Tailscale on the two internal machines:
+
+```bash
+ssh tailscale-etet-internal-1 -- sudo tailscale down
+ssh tailscale-etet-internal-2 -- sudo tailscale down
+```
+
+Attempt to SSH from internal-1 to internal-2, via the internal-2 hostname:
+
+```bash
+ssh tailscale-etet-internal-1 -- ssh -o StrictHostKeyChecking=no internal-2 -- hostname
+```
+
+This should fail with the following message,
+because the Tailscale DNS is not running:
+
+```text
+ssh: Could not resolve hostname internal-2: Temporary failure in name resolution
+```
+
+Attempt to SSH from internal-1 to internal-2 again, this time via its private ip address:
+
+```bash
+IP="$(ssh tailscale-etet-internal-2 -- ip -br address show dev eth0 | awk '{ sub("/.*", "", $3); print $3; }')"
+ssh tailscale-etet-internal-1 -- ssh -o StrictHostKeyChecking=no "$IP" -- hostname
+```
+
+This should also fail, this time with a timeout.
+This is expected, since both machines are on separate private networks, with no routes between them.
+
+```text
+ssh: connect to host 10.1.2.5 port 22: Connection timed out
+```
+
+#### SSH with Tailscale
+
+Bring Tailscale back up:
+
+```bash
+ssh tailscale-etet-internal-1 -- sudo tailscale up
+ssh tailscale-etet-internal-2 -- sudo tailscale up
+```
+
+Attempt to SSH from internal-1 to internal-2, via the internal-2 hostname:
+
+```bash
+ssh tailscale-etet-internal-1 -- ssh -o StrictHostKeyChecking=no internal-2 -- hostname
+```
+
+This should succeed, and the output should be the result of running `hostname` on internal-2:
+
+```text
+internal-2
+```
+
+Check the status of Tailscale:
+
+```bash
+ssh tailscale-etet-internal-1 -- tailscale status
+```
+
+It should now show fresh information about the connection to internal-2:
+
+```text
+100.64.0.1      internal-1           user1        linux   -
+100.64.0.3      derper               user2        linux   -
+100.64.0.2      internal-2           user1        linux   active; direct 52.156.185.242:1024, tx 19372 rx 17988
+```
+
+Note that it shows a direct connection through some public IP address.
+It's unknown what this means, as this is not the DERP relay.
+Tailscale has managed to negotiate some kind of direct connection,
+most likely using the DERP server to help negotiate it.
+
+### Test the DERP server
+
+We can probe the DERP server from Tailscale,
+to check it's configured and operating as expected.
+
+First, we can use the `tailscale netcheck` subcommand:
+
+```bash
+ssh tailscale-etet-internal-1 -- tailscale netcheck
+```
+
+This will output several lines,
+but we're interested in the last few about DERP.
+The output should look like this:
+
+```text
+Report:
+        ...
+        * Nearest DERP: Custom Region One
+        * DERP latency:
+                - one: 1.1ms   (Custom Region One)
+```
+
+TODO: figure out what firewall rules to set to force traffic through DERP, so we can test ssh'ing to a machine through the relayed connection
 
 TODO: test more things - see internal test plan doc
