@@ -15,13 +15,6 @@ description: |
 
   After installing this snap, visit the Tailscale documentation at https://tailscale.com/kb/1017/install to get started.
 
-  Since restarting the Tailscale service may result in network interruptions,
-  the service is not restarted on snap refresh.
-  This lets you control when the service restarts.
-  You must manually restart with `sudo snap restart tailscale`
-  at your convenience after refreshing the snap,
-  to start the new version running.
-
   **Confinement**
 
   The snap is strictly confined, and this currently brings some limitations.
@@ -90,10 +83,6 @@ apps:
     # NOTE: cannot use layout to support default socket location, because /var/run is not allowed for layout.
     command: bin/tailscaled --socket $SNAP_COMMON/socket/tailscaled.sock --statedir $SNAP_COMMON --verbose 10
     daemon: simple
-    # Don't restart the service on snap refresh.
-    # Restarting tailscaled could cause network interruptions,
-    # so let the user control when to restart.
-    refresh-mode: endure
     plugs:
       - firewall-control
       - network
