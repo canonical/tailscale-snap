@@ -180,7 +180,7 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
     "tag:derper": ["group:derper"],
   },
   "acls": [
-    // users can access internal servers, but only over ssh
+    // ACL01 users can access internal servers, but only over ssh
     {
       "action": "accept",
       "src": ["group:users"],
@@ -188,7 +188,7 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
         "tag:internal:22",
       ]
     },
-    // user1 is an admin, and can access derper machines, and other ports on internal servers
+    // ACL02 user1 is an admin, and can access derper machines, and other ports on internal servers
     {
       "action": "accept",
       "src": ["user1"],
@@ -197,7 +197,7 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
         "tag:internal:*",
       ]
     },
-    // internal servers can access each other
+    // ACL03 internal servers can access each other
     {
       "action": "accept",
       "src": ["group:internal"],
@@ -205,7 +205,7 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
         "group:internal:*",
       ]
     },
-    // all machines can ping all other machines
+    // ACL04 all machines can ping all other machines
     {
       "action": "accept",
       "src": ["*"],
@@ -213,8 +213,10 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
       "dst": [
         "*:*",
       ]
-    // Derper cannot access any servers; this will only be used for derper verify-clients (in the future; not implemented yet).
-    // No machines can access user machines, and user machines can't access each other.
+    // NOTES:
+    //   Derper cannot access any servers; this will only be used for derper verify-clients (in the future; not implemented yet).
+    //   No machines can access user machines.
+    //   User machines cannot access each other.
     },
   ]
 }
@@ -504,7 +506,7 @@ ssh tailscale-etet-internal-1 -- sudo tailscale down
 Attempt to SSH from user-1 to internal-1, via the internal-1 hostname:
 
 ```bash
-ssh tailscale-etet-user-1 -- ssh -o StrictHostKeyChecking=no internal-1 -- hostname
+ssh tailscale-etet-user-1 -- ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- hostname
 ```
 
 This should fail with the following message,
@@ -519,7 +521,7 @@ Attempt to SSH from user-1 to internal-1 again, this time via its private ip add
 ```bash
 IP="$(ssh tailscale-etet-internal-1 -- ip -br address show dev eth0 | awk '{ sub("/.*", "", $3); print $3; }')"
 echo "$IP"
-ssh tailscale-etet-user-1 -- ssh -o StrictHostKeyChecking=no "$IP" -- hostname
+ssh tailscale-etet-user-1 -- ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no "$IP" -- hostname
 ```
 
 This should also fail, this time with a timeout.
@@ -541,7 +543,7 @@ ssh tailscale-etet-internal-1 -- sudo tailscale up
 Attempt to SSH from user-1 to internal-1, via the internal-1 hostname:
 
 ```bash
-ssh tailscale-etet-user-1 -- $'ssh -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-user-1 -- $'ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
 ```
 
 This should succeed, and the expected output should be:
@@ -618,7 +620,7 @@ EOF
 Attempt to SSH from user-1 to internal-1 again:
 
 ```bash
-ssh tailscale-etet-user-1 -- $'ssh -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-user-1 -- $'ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
 ```
 
 This should succeed.
@@ -664,5 +666,44 @@ pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
 direct connection not established
 ```
 
+### Test policies
 
-TODO: test policies
+First, test some ACL policies by attempting to SSH between the machines, for all combinations of machines.
+
+NOTE: several of the machines are on the same private network, so they can reach each other, regardless of the policies set by Tailscale.
+Here, we're forcing SSH to use the tailscale interface by adding the `-B tailscale0` arguments.
+
+```bash
+ssh tailscale-etet-user-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\' succeeds - ACL01'
+ssh tailscale-etet-user-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-2 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+ssh tailscale-etet-user-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no derper -- echo $(hostname) to \'$(hostname)\' succeeds - ACL02'
+
+ssh tailscale-etet-user-2 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\' succeeds - ACL01'
+ssh tailscale-etet-user-2 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-1 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+ssh tailscale-etet-user-2 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no derper -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+
+ssh tailscale-etet-internal-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-1 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+ssh tailscale-etet-internal-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-2 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+ssh tailscale-etet-internal-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no derper -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+
+ssh tailscale-etet-derper -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-1 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+ssh tailscale-etet-derper -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-2 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+ssh tailscale-etet-derper -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+```
+
+The expected output:
+
+```text
+user-1 to internal-1 succeeds - ACL01
+ssh: connect to host user-2 port 22: Connection timed out
+user-1 to derper succeeds - ACL02
+user-2 to internal-1 succeeds - ACL01
+ssh: connect to host user-1 port 22: Connection timed out
+ssh: connect to host derper port 22: Connection timed out
+ssh: connect to host user-1 port 22: Connection timed out
+ssh: connect to host user-2 port 22: Connection timed out
+ssh: connect to host derper port 22: Connection timed out
+ssh: connect to host user-1 port 22: Connection timed out
+ssh: connect to host user-2 port 22: Connection timed out
+ssh: connect to host internal-1 port 22: Connection timed out
+```
