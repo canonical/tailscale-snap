@@ -233,7 +233,11 @@ You can also run a Headscale command to check if the config is valid:
 ssh tailscale-etet-headscale -- sudo headscale configtest
 ```
 
-This should report no errors.
+This should not report any errors:
+
+```text
+2025-01-16T01:44:44Z INF Opening database database=sqlite3 path=/var/snap/headscale/common/internal/db.sqlite
+```
 
 Create the users for testing:
 
@@ -257,6 +261,8 @@ In this environment, this simulates a jumpbox machine within a locked down datac
 
 ```bash
 KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user internal)"
+echo "$KEY"
+
 ssh tailscale-etet-internal-1 -- <<EOF
 set -x
 sudo snap install --edge tailscale
@@ -289,6 +295,8 @@ In this environment, this simulates an end user machine like a laptop, owned by 
 
 ```bash
 KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user user1)"
+echo "$KEY"
+
 ssh tailscale-etet-user-1 -- <<EOF
 set -x
 sudo snap install --edge tailscale
@@ -413,6 +421,8 @@ On derper, install Tailscale and authenticate to the Headscale server using a pr
 
 ```bash
 KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user derper)"
+echo "$KEY"
+
 ssh tailscale-etet-derper -- <<EOF
 set -x
 sudo snap install --edge tailscale
@@ -508,6 +518,7 @@ Attempt to SSH from user-1 to internal-1 again, this time via its private ip add
 
 ```bash
 IP="$(ssh tailscale-etet-internal-1 -- ip -br address show dev eth0 | awk '{ sub("/.*", "", $3); print $3; }')"
+echo "$IP"
 ssh tailscale-etet-user-1 -- ssh -o StrictHostKeyChecking=no "$IP" -- hostname
 ```
 
@@ -597,6 +608,7 @@ Temporarily enable `ufw` and deny all outgoing UDP traffic:
 ssh tailscale-etet-user-1 -- <<'EOF'
 set -x
 yes | sudo ufw enable
+sudo ufw allow ssh
 sudo ufw deny out from any to any proto udp
 sudo ufw status
 EOF
@@ -611,7 +623,7 @@ ssh tailscale-etet-user-1 -- $'ssh -o StrictHostKeyChecking=no internal-1 -- ech
 
 This should succeed.
 
-Check Tailscale's status again:
+Check Tailscale status again:
 
 ```bash
 ssh tailscale-etet-user-1 -- tailscale status
@@ -625,3 +637,32 @@ The output should show `relay` with the name of the custom DERP server ("one") f
 100.64.0.1      internal-1           internal     linux   active; relay "one", tx 12824 rx 13768
 100.64.0.3      user-2               user2        linux   -
 ```
+
+Note that it may still display a direct connection,
+probably due to the previous NAT traversal still being active.
+In this case, wait a few minutes, and try again.
+
+You can also confirm a direct connection is not possible by using `tailscale ping`:
+
+```bash
+ssh tailscale-etet-user-1 -- tailscale ping internal-1
+```
+
+Expected output:
+
+``text
+pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 4ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 2ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 2ms
+pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
+direct connection not established
+```
+
+
+TODO: test policies
