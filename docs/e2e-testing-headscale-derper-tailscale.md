@@ -1,6 +1,5 @@
 # End to end testing: Tailscale, Headscale, Derper
 
-
 ## Deploy environment
 
 For this testing, we'll use VMs on Azure.
@@ -9,7 +8,6 @@ with public IP addresses and DNS names for Headscale and Derper.
 
 This document deploys everything in the `australiaeast` region;
 if you deploy in another region, substitute the name accordingly in domain names where referenced.
-
 
 There is a provided Terraform module to deploy the environment,
 or you can deploy it manually.
