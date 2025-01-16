@@ -495,7 +495,7 @@ for HOST in tailscale-etet-{internal-1,user-{1,2},derper}; do
 done
 ```
 
-#### SSH without Tailscale
+#### Test SSH without Tailscale
 
 Take down Tailscale on the two machines:
 
@@ -532,7 +532,7 @@ This is expected, since both machines are on separate private networks, with no 
 ssh: connect to host 10.0.1.5 port 22: Connection timed out
 ```
 
-#### SSH with Tailscale
+#### Test SSH with Tailscale
 
 Bring Tailscale back up:
 
@@ -578,13 +578,15 @@ it's likely been able to succeed through a [NAT traversal strategy](https://tail
 
 We can probe the DERP server from Tailscale,
 to check it's configured and operating as expected.
+This time, we'll test from user-2,
+and we'll make some local firewall changes to prevent Tailscale from making a direct connection.
 
 #### Quick test
 
 First, we can use the `tailscale netcheck` subcommand:
 
 ```bash
-ssh tailscale-etet-user-1 -- tailscale netcheck
+ssh tailscale-etet-user-2 -- tailscale netcheck
 ```
 
 This will output several lines,
@@ -605,10 +607,10 @@ This shows that the DERP server is reachable and operating.
 
 To test connection relaying over DERP,
 we'll need to add some firewall rules to block Tailscale's NAT traversal techniques.
-Enable `ufw` and deny all outgoing UDP traffic:
+Temporarily enable `ufw` and deny all outgoing UDP traffic:
 
 ```bash
-ssh tailscale-etet-user-1 -- <<'EOF'
+ssh tailscale-etet-user-2 -- <<'EOF'
 set -x
 yes | sudo ufw enable
 sudo ufw allow ssh
@@ -618,18 +620,22 @@ EOF
 
 ```
 
-Attempt to SSH from user-1 to internal-1 again:
+Attempt to SSH from user-2 to internal-1:
 
 ```bash
-ssh tailscale-etet-user-1 -- $'ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+ssh tailscale-etet-user-2 -- $'ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
 ```
 
-This should succeed.
+This should succeed, with output:
 
-Check Tailscale status again:
+```text
+user-2 to internal-1
+```
+
+Check Tailscale status:
 
 ```bash
-ssh tailscale-etet-user-1 -- tailscale status
+ssh tailscale-etet-user-2 -- tailscale status
 ```
 
 The output should show `relay` with the name of the custom DERP server ("one") for the `internal-1` machine:
@@ -641,14 +647,16 @@ The output should show `relay` with the name of the custom DERP server ("one") f
 100.64.0.3      user-2               user2        linux   -
 ```
 
-Note that it may still display a direct connection,
-probably due to the previous NAT traversal still being active.
-In this case, wait a few minutes, and try again.
+NOTE: if you had recently connected between `user-2` and `internal-1` over Tailscale,
+before setting the firewall rules,
+it may still display a direct connection.
+This is probably due to the previous NAT traversal still being active.
+In this case, wait a few minutes, and try SSH'ing and checking the status again.
 
 You can also confirm a direct connection is not possible by using `tailscale ping`:
 
 ```bash
-ssh tailscale-etet-user-1 -- tailscale ping internal-1
+ssh tailscale-etet-user-2 -- tailscale ping internal-1
 ```
 
 Expected output:
