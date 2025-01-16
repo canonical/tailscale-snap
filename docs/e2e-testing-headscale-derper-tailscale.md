@@ -650,7 +650,7 @@ ssh tailscale-etet-user-1 -- tailscale ping internal-1
 
 Expected output:
 
-``text
+```text
 pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
 pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
 pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
