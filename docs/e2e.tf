@@ -451,8 +451,8 @@ resource "azurerm_linux_virtual_machine" "internal_1" {
   }
 }
 
-resource "azurerm_network_interface" "internal_2" {
-  name                = "internal-2-nic"
+resource "azurerm_network_interface" "user_1" {
+  name                = "user-1-nic"
   location            = azurerm_resource_group.tailscale_testing.location
   resource_group_name = azurerm_resource_group.tailscale_testing.name
 
@@ -463,19 +463,19 @@ resource "azurerm_network_interface" "internal_2" {
   }
 }
 
-resource "azurerm_network_interface_security_group_association" "internal_2" {
-  network_interface_id      = azurerm_network_interface.internal_2.id
+resource "azurerm_network_interface_security_group_association" "user_1" {
+  network_interface_id      = azurerm_network_interface.user_1.id
   network_security_group_id = azurerm_network_security_group.ssh_only.id
 }
 
-resource "azurerm_linux_virtual_machine" "internal_2" {
-  name                = "internal-2"
+resource "azurerm_linux_virtual_machine" "user_1" {
+  name                = "user-1"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
   size                = "Standard_DS1_v2"
   admin_username      = "ubuntu"
   network_interface_ids = [
-    azurerm_network_interface.internal_2.id,
+    azurerm_network_interface.user_1.id,
   ]
 
   admin_ssh_key {
@@ -496,6 +496,50 @@ resource "azurerm_linux_virtual_machine" "internal_2" {
   }
 }
 
+resource "azurerm_network_interface" "user_2" {
+  name                = "user-2-nic"
+  location            = azurerm_resource_group.tailscale_testing.location
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.vnet_subnet_2.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "user_2" {
+  network_interface_id      = azurerm_network_interface.user_2.id
+  network_security_group_id = azurerm_network_security_group.ssh_only.id
+}
+
+resource "azurerm_linux_virtual_machine" "user_2" {
+  name                = "user-2"
+  resource_group_name = azurerm_resource_group.tailscale_testing.name
+  location            = azurerm_resource_group.tailscale_testing.location
+  size                = "Standard_DS1_v2"
+  admin_username      = "ubuntu"
+  network_interface_ids = [
+    azurerm_network_interface.user_2.id,
+  ]
+
+  admin_ssh_key {
+    username   = "ubuntu"
+    public_key = var.ssh_key
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
+    version   = "latest"
+  }
+}
 output "ssh_config" {
   description = "SSH config snippet for access to the machines"
   value       = <<-EOT
@@ -520,9 +564,14 @@ output "ssh_config" {
     Hostname ${resource.azurerm_linux_virtual_machine.internal_1.private_ip_address}
     User ${resource.azurerm_linux_virtual_machine.internal_1.admin_username}
 
-  Host tailscale-etet-internal-2
+  Host tailscale-etet-user-1
     ProxyJump tailscale-etet-jumpbox-2
-    Hostname ${resource.azurerm_linux_virtual_machine.internal_2.private_ip_address}
-    User ${resource.azurerm_linux_virtual_machine.internal_2.admin_username}
+    Hostname ${resource.azurerm_linux_virtual_machine.user_1.private_ip_address}
+    User ${resource.azurerm_linux_virtual_machine.user_1.admin_username}
+
+  Host tailscale-etet-user-2
+    ProxyJump tailscale-etet-jumpbox-2
+    Hostname ${resource.azurerm_linux_virtual_machine.user_2.private_ip_address}
+    User ${resource.azurerm_linux_virtual_machine.user_2.admin_username}
   EOT
 }
