@@ -180,12 +180,13 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
     "tag:derper": ["group:derper"],
   },
   "acls": [
-    // ACL01 users can access internal servers, but only over ssh
+    // ACL01 users can access internal servers and derper, but only over ssh
     {
       "action": "accept",
       "src": ["group:users"],
       "dst": [
         "tag:internal:22",
+        "tag:derper:22",
       ]
     },
     // ACL02 user1 is an admin, and can access derper machines, and other ports on internal servers
@@ -668,6 +669,8 @@ direct connection not established
 
 ### Test policies
 
+#### SSH connectivity rules
+
 First, test some ACL policies by attempting to SSH between the machines, for all combinations of machines.
 
 NOTE: several of the machines are on the same private network, so they can reach each other, regardless of the policies set by Tailscale.
@@ -676,11 +679,11 @@ Here, we're forcing SSH to use the tailscale interface by adding the `-B tailsca
 ```bash
 ssh tailscale-etet-user-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\' succeeds - ACL01'
 ssh tailscale-etet-user-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-2 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
-ssh tailscale-etet-user-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no derper -- echo $(hostname) to \'$(hostname)\' succeeds - ACL02'
+ssh tailscale-etet-user-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no derper -- echo $(hostname) to \'$(hostname)\' succeeds - ACL01 or ACL02'
 
 ssh tailscale-etet-user-2 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\' succeeds - ACL01'
 ssh tailscale-etet-user-2 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-1 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
-ssh tailscale-etet-user-2 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no derper -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
+ssh tailscale-etet-user-2 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no derper -- echo $(hostname) to \'$(hostname)\' succeeds - ACL01'
 
 ssh tailscale-etet-internal-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-1 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
 ssh tailscale-etet-internal-1 -- $'ssh -B tailscale0 -o ConnectTimeout=2 -o StrictHostKeyChecking=no user-2 -- echo $(hostname) to \'$(hostname)\' should fail with timeout - no ACL rule matches'
@@ -696,14 +699,50 @@ The expected output:
 ```text
 user-1 to internal-1 succeeds - ACL01
 ssh: connect to host user-2 port 22: Connection timed out
-user-1 to derper succeeds - ACL02
+user-1 to derper succeeds - ACL01 or ACL02
 user-2 to internal-1 succeeds - ACL01
 ssh: connect to host user-1 port 22: Connection timed out
-ssh: connect to host derper port 22: Connection timed out
+user-2 to derper succeeds - ACL01
 ssh: connect to host user-1 port 22: Connection timed out
 ssh: connect to host user-2 port 22: Connection timed out
 ssh: connect to host derper port 22: Connection timed out
 ssh: connect to host user-1 port 22: Connection timed out
 ssh: connect to host user-2 port 22: Connection timed out
 ssh: connect to host internal-1 port 22: Connection timed out
+```
+
+#### Port-based ACLs
+
+Now we can test the port based ACLs.
+According to ACL01, the `users` group can reach `derper` over port 22,
+but according to ACL02, only `user1` can reach `derper` on other ports.
+
+We've already verified in the previous section that `user-1` and `user-2` can both connect to `derper` over port 22 (SSH).
+Now try connecting to the derper web page on port 80, from `user-1` - this should succeed due to ACL rule ACL01:
+
+```bash
+ssh tailscale-etet-user-1 -- curl --connect-timeout 2 -Is derper:80
+```
+
+Expected output:
+
+```text
+HTTP/1.1 302 Found
+...
+```
+
+Try connecting to the same page from `user-2`.
+This should fail, because there are no ACL rules that would permit `user-2` access to `derper` on port 80.
+
+```bash
+ssh tailscale-etet-user-2 -- curl --connect-timeout 2 derper:80
+```
+
+Expected output:
+
+```text
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0
+curl: (28) Failed to connect to derper port 80 after 2002 ms: Timeout was reached
 ```
