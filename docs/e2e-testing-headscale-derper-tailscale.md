@@ -605,7 +605,7 @@ This shows that the DERP server is reachable and operating.
 
 To test connection relaying over DERP,
 we'll need to add some firewall rules to block Tailscale's NAT traversal techniques.
-Temporarily enable `ufw` and deny all outgoing UDP traffic:
+Enable `ufw` and deny all outgoing UDP traffic:
 
 ```bash
 ssh tailscale-etet-user-1 -- <<'EOF'
