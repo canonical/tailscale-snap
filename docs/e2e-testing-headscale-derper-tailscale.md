@@ -43,6 +43,8 @@ Please copy this to your ssh config in order to connect to the machines for the 
 
 In this step, we will install all the required software, and configure them together.
 
+TODO: improve the diagram
+
 A simple diagram of how the services are connected:
 
 ```text
@@ -74,6 +76,8 @@ sudo snap logs derper
 EOF
 
 ```
+
+TODO: these domain names are public, so there is chance of conflict if two people deploy this testing simultaneously or simply the domain name is taken - maybe these should be variables for this document and terraform?
 
 Once this is done, you should be able to visit https://derper.australiaeast.cloudapp.azure.com/ in your browser,
 and see a generic public info page about the Tailscale DERP server.
