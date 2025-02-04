@@ -52,6 +52,8 @@ resource "azurerm_subnet" "vnet_subnet_2" {
   address_prefixes     = ["10.1.2.0/24"]
 }
 
+# TODO: these domain names are public (derper and headscale) so there is chance of conflict if two people deploy this testing simultaneously or simply the domain name is taken - maybe these should be variables for this document and terraform?
+
 resource "azurerm_public_ip" "derper" {
   name                = "derper"
   domain_name_label   = "derper"

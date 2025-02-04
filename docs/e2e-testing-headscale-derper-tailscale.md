@@ -43,26 +43,24 @@ Please copy this to your ssh config in order to connect to the machines for the 
 
 In this step, we will install all the required software, and configure them together.
 
-TODO: improve the diagram
-
-A simple diagram of how the services are connected:
+A simple diagram of the VMs (labels are the VM hostnames), and how they relate to each other.
 
 ```text
-Headscale -----> Derper (and Tailscale)
+headscale -----> derper
   ^
   |
   +------------+--------+
   |            |        |
-Internal-1   User-1   User-2
+internal-1   user-1   user-2
   ^            ^        ^
   |            |        |
   |            +--------+
   |            |
-Jumpbox-1    Jumpbox-2
+jumpbox-1    jumpbox-2
 ```
 
-All machines have a public ip address, except for Internal-1, User-1 and User-2.
-User-1 and User-2 are on a separate network to the others, and cannot reach each other normally (without Tailscale).
+All machines have a public ip address, except for internal-1, user-1 and user-2.
+User-1, user-2, and jumpbox-2 are on a separate network to the other machines, so normally they cannot reach them (without Tailscale that is).
 
 ### Configure Derper
 
@@ -76,8 +74,6 @@ sudo snap logs derper
 EOF
 
 ```
-
-TODO: these domain names are public, so there is chance of conflict if two people deploy this testing simultaneously or simply the domain name is taken - maybe these should be variables for this document and terraform?
 
 Once this is done, you should be able to visit https://derper.australiaeast.cloudapp.azure.com/ in your browser,
 and see a generic public info page about the Tailscale DERP server.
