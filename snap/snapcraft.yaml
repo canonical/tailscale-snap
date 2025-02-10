@@ -101,8 +101,8 @@ parts:
       - iptables
       - openssh-client  # for tailscale ssh
     override-build: |
-      go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscale
-      go install -p $CRAFT_PARALLEL_BUILD_COUNT ./cmd/tailscaled
+      ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscale
+      ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscaled
     override-prime: |
       craftctl default
       ln -s xtables-nft-multi $CRAFT_PRIME/usr/sbin/iptables
