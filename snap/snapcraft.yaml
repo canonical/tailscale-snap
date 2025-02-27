@@ -99,7 +99,6 @@ parts:
       - go
     stage-packages:
       - iptables
-      - openssh-client  # for tailscale ssh
     override-build: |
       ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscale
       ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscaled
