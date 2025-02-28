@@ -68,7 +68,10 @@ User-1, user-2, and jumpbox-2 are on a separate network to the other machines, s
 ssh tailscale-etet-derper -- <<'EOF'
 set -x
 sudo snap install --edge derper
-sudo snap set derper hostname=derper.australiaeast.cloudapp.azure.com
+sudo snap install --edge tailscale
+sudo snap connect derper:tailscale-socket tailscale:socket
+sudo snap set derper hostname=derper.australiaeast.cloudapp.azure.com verify-clients=true
+sudo snap restart derper
 sudo snap restart derper
 sudo snap logs derper
 EOF
@@ -416,8 +419,6 @@ By default, Derper runs as an open relay.
 It does have a `verify-clients` mode though, which uses a locally running Tailscale service to authenticate connections, to restrict use to machines in the same tailnet.
 So here we configure Tailscale on the derper machine to support this.
 
-NOTE: `verify-clients` mode is not currently supported in the Derper snap, so this is a provisional setup only: see https://github.com/canonical/derper-snap/pull/4 for progress.
-
 On derper, install Tailscale and authenticate to the Headscale server using a preauth key with the `derper` user and tag `derper`:
 
 ```bash
@@ -426,7 +427,6 @@ echo "$KEY"
 
 ssh tailscale-etet-derper -- <<EOF
 set -x
-sudo snap install --edge tailscale
 sudo tailscale up --advertise-tags tag:derper --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
 tailscale status
 tailscale debug derp-map
@@ -672,6 +672,20 @@ pong from internal-1 (100.64.0.1) via DERP(one) in 2ms
 pong from internal-1 (100.64.0.1) via DERP(one) in 3ms
 direct connection not established
 ```
+
+#### Test verify-clients in derper blocks unknown connections
+
+TODO:
+- remove the tailscale socket snap interface connection
+- verify ssh as above is no longer possible
+- verify the derper logs show errors about the tailscaled socket not found
+- re-add the tailscale socket snap interface connection
+- verify ssh as above is working again
+- run `tailscale down` on the derper machine
+- verify ssh as above is no longer possible
+- verify derper logs show "not authorized (not found in local tailscaled)"
+- run `tailscale up` on the derper machine
+- verify ssh as above is working again
 
 ### Test policies
 
