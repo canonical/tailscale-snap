@@ -83,12 +83,6 @@ parts:
     plugin: go
     build-snaps:
       - go
-    stage-packages:
-      - iptables
     override-build: |
       ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscale
       ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscaled
-    override-prime: |
-      craftctl default
-      ln -s xtables-nft-multi $CRAFT_PRIME/usr/sbin/iptables
-      ln -s xtables-nft-multi $CRAFT_PRIME/usr/sbin/ip6tables
