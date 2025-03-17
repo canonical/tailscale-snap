@@ -35,6 +35,8 @@ description: |
   If any malfunction with Tailscale features is observed, where this issue is not observed in Tailscale installed from a source other than the snap, please open an issue at https://github.com/canonical/tailscale-snap/issues .
   To report something related to Tailscale itself, please see https://github.com/tailscale/tailscale/issues .
 
+  This snap is maintained by Canonical, and is not necessarily endorsed or officially maintained by the upstream developers.
+
 platforms:
   amd64:
   arm64:
