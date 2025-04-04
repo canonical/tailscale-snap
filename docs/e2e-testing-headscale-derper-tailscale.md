@@ -72,7 +72,6 @@ sudo snap install --edge tailscale
 sudo snap connect derper:tailscale-socket tailscale:socket
 sudo snap set derper hostname=derper.australiaeast.cloudapp.azure.com verify-clients=true
 sudo snap restart derper
-sudo snap restart derper
 sudo snap logs derper
 EOF
 
@@ -216,7 +215,7 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
         "*:*",
       ]
     // NOTES:
-    //   Derper cannot access any servers; this will only be used for derper verify-clients (in the future; not implemented yet).
+    //   Derper cannot access any servers: tailscale on this machine will only be used for derper in verify-clients mode.
     //   No machines can access user machines.
     //   User machines cannot access each other.
     },
@@ -241,6 +240,7 @@ This should not report any errors:
 
 ```text
 2025-01-16T01:44:44Z INF Opening database database=sqlite3 path=/var/snap/headscale/common/internal/db.sqlite
+... [other DBG and TRC level log lines]
 ```
 
 Create the users for testing:
@@ -257,6 +257,41 @@ EOF
 ```
 
 ### Configure Tailscale
+
+#### Configure Tailscale on machine derper
+
+By default, Derper runs as an open relay.
+It does have a `verify-clients` mode though, which uses a locally running Tailscale service to authenticate connections, to restrict use to machines in the same tailnet.
+So here we configure Tailscale on the derper machine to support this.
+
+On derper, install Tailscale and authenticate to the Headscale server using a preauth key with the `derper` user and tag `derper`:
+
+```bash
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user derper)"
+echo "$KEY"
+
+ssh tailscale-etet-derper -- <<EOF
+set -x
+sudo tailscale up --advertise-tags tag:derper --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
+tailscale status
+tailscale debug derp-map
+EOF
+
+```
+
+Verify that the output of `tailscale status` shows an ip address and the `derper` user for the `derper` machine.
+
+Expected output:
+
+```text
++ tailscale status
+100.64.0.4      derper               derper       linux   -
++ tailscale debug derp-map
+{
+        "Regions": {
+                                        "HostName": "derper.australiaeast.cloudapp.azure.com"
+... some lines omitted, but should only be one region
+```
 
 #### Configure Tailscale on machine internal-1
 
@@ -284,6 +319,7 @@ Expected output:
 
 ```text
 + tailscale status
+100.64.0.4      derper               derper       linux   -
 100.64.0.1      internal-1          internal        linux   -
 + tailscale debug derp-map
 {
@@ -318,6 +354,7 @@ Expected output:
 
 ```text
 + tailscale status
+100.64.0.4      derper               derper       linux   -
 100.64.0.2      user-1               user1        linux   -
 100.64.0.1      internal-1           internal     linux   -
 + tailscale debug derp-map
@@ -346,7 +383,7 @@ and wait (it will not exit until authentication is complete).
 The url should look something like:
 
 ```text
-https://headscale.australiaeast.cloudapp.azure.com/register/mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
+https://headscale.australiaeast.cloudapp.azure.com/register/d_wH0pT12dSDULiChgKSYNg2
 ```
 
 Navigate to this url to continue authentication.
@@ -358,7 +395,7 @@ The text on the page should look something like:
 > Run the command below in the headscale server to add this machine to your network:
 >
 > ```text
-> headscale nodes register --user USERNAME --key mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
+> headscale nodes register --user USERNAME --key d_wH0pT12dSDULiChgKSYNg2
 > ```
 
 Replace `USERNAME` with the `user2` Headscale user,
@@ -366,7 +403,7 @@ then run it on the Headscale server VM.
 Note that the long key displayed here is an example only; use the one actually displayed by the commnad.
 
 ```bash
-ssh tailscale-etet-headscale -- sudo headscale nodes register --user user2 --key mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
+ssh tailscale-etet-headscale -- sudo headscale nodes register --user user2 --key d_EXAMPLE000000000000000
 ```
 
 This command should output:
@@ -383,7 +420,7 @@ And the previous `tailscale up ...` command should exit with a success message:
 
 To authenticate, visit:
 
-        https://headscale.australiaeast.cloudapp.azure.com/register/mkey:66989ac71e017f9f0ce2a58f4b37005da55554a6bcd75c60fe4af3277bf95d4b
+        https://headscale.australiaeast.cloudapp.azure.com/register/d_wH0pT12dSDULiChgKSYNg2
 
 Success.
 ```
@@ -403,47 +440,10 @@ Expected output:
 
 ```text
 + tailscale status
-100.64.0.3      user-2               user2        linux   -
-100.64.0.1      internal-1           internal     linux   -
-100.64.0.2      user-1               user1        linux   -
-+ tailscale debug derp-map
-{
-        "Regions": {
-                                        "HostName": "derper.australiaeast.cloudapp.azure.com"
-... some lines omitted, but should only be one region
-```
-
-#### Configure Tailscale on machine derper
-
-By default, Derper runs as an open relay.
-It does have a `verify-clients` mode though, which uses a locally running Tailscale service to authenticate connections, to restrict use to machines in the same tailnet.
-So here we configure Tailscale on the derper machine to support this.
-
-On derper, install Tailscale and authenticate to the Headscale server using a preauth key with the `derper` user and tag `derper`:
-
-```bash
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user derper)"
-echo "$KEY"
-
-ssh tailscale-etet-derper -- <<EOF
-set -x
-sudo tailscale up --advertise-tags tag:derper --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
-tailscale status
-tailscale debug derp-map
-EOF
-
-```
-
-Verify that the output of `tailscale status` shows an ip address and the `derper` user for the `derper` machine.
-
-Expected output:
-
-```text
-+ tailscale status
 100.64.0.4      derper               derper       linux   -
+100.64.0.3      user-2               user2        linux   -
 100.64.0.1      internal-1           internal     linux   -
 100.64.0.2      user-1               user1        linux   -
-100.64.0.3      user-2               user2        linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -675,17 +675,150 @@ direct connection not established
 
 #### Test verify-clients in derper blocks unknown connections
 
-TODO:
-- remove the tailscale socket snap interface connection
-- verify ssh as above is no longer possible
-- verify the derper logs show errors about the tailscaled socket not found
-- re-add the tailscale socket snap interface connection
-- verify ssh as above is working again
-- run `tailscale down` on the derper machine
-- verify ssh as above is no longer possible
-- verify derper logs show "not authorized (not found in local tailscaled)"
-- run `tailscale up` on the derper machine
-- verify ssh as above is working again
+##### Blocking connections when tailscale is not present
+
+Remove the connection between tailscale and derper:
+
+```bash
+ssh tailscale-etet-derper -- <<'EOF'
+sudo snap disconnect derper:tailscale-socket tailscale:socket
+sudo snap restart derper
+EOF
+
+```
+
+Attempt to SSH from user-2 to internal-1 again:
+
+```bash
+ssh tailscale-etet-user-2 -- $'ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+```
+
+Verify it fails - expected output:
+
+```text
+ssh: connect to host internal-1 port 22: Connection timed out
+```
+
+Verify that the derper service is showing errors about accessing the tailscaled socket:
+
+```bash
+ssh tailscale-etet-derper -- sudo snap logs derper
+```
+
+Expected output:
+
+```text
+2025-04-04T06:00:57Z derper.derper[5836]: 2025/04/04 06:00:57 derp: 4.196.108.54:59954: client nodekey:b0f96a1b62cba89c60c298a7a7e8b8773f6e636c565d074a752b12a5059a1356 rejected: failed to query local tailscaled status for nodekey:b0f96a1b62cba89c60c298a7a7e8b8773f6e636c565d074a752b12a5059a1356: Failed to connect to local Tailscale daemon for /localapi/v0/whois; not running? Error: dial unix /var/snap/derper/x1/tailscale-socket/tailscaled.sock: connect: no such file or directory
+2025-04-04T06:00:57Z derper.derper[5836]: 2025/04/04 06:00:57 derp: 4.196.104.39:1024: client nodekey:10c7943005db1d1796f357594f1267cbfba2d30873699630a4b01a6dff7b326d rejected: failed to query local tailscaled status for nodekey:10c7943005db1d1796f357594f1267cbfba2d30873699630a4b01a6dff7b326d: Failed to connect to local Tailscale daemon for /localapi/v0/whois; not running? Error: dial unix /var/snap/derper/x1/tailscale-socket/tailscaled.sock: connect: no such file or directory
+...
+```
+
+##### Reset
+
+Get it back to a working state:
+
+```bash
+ssh tailscale-etet-derper -- <<'EOF'
+sudo snap connect derper:tailscale-socket tailscale:socket
+sudo snap restart derper
+EOF
+
+```
+
+Attempt to SSH from user-2 to internal-1 again:
+
+```bash
+ssh tailscale-etet-user-2 -- $'ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+```
+
+Verify it succeeds now:
+
+```text
+internal-2 to internal-1
+```
+
+##### Blocking connections when tailscale is not authenticated to the tailnet
+
+Disconnect tailscale from the tailnet on the derper machine:
+
+
+```bash
+ssh tailscale-etet-derper -- <<'EOF'
+sudo tailscale logout
+tailscale status
+sudo snap restart derper
+EOF
+
+```
+
+> NOTE: unsure if it's a feature or a bug that derper appears to cache authorization - if derper is not restarted after logging out tailscale, then derper will still relay the connection from user-2 below.
+
+> NOTE: It seems that derper will still authenticate clients with the tailnet if tailscale is down (`sudo tailscale down`) but still authenticated to the tailnet. It needs to be actually logged out (`sudo tailscale logout`) to block the connections.
+
+Expected output:
+
+```text
+...
+Logged out.
+...
+```
+
+Attempt to SSH from user-2 to internal-1 again:
+
+```bash
+ssh tailscale-etet-user-2 -- $'ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+```
+
+Verify it fails - expected output:
+
+```text
+ssh: connect to host internal-1 port 22: Connection timed out
+```
+
+Verify that the derper service is running successfully, and displays messages about connection unauthorized:
+
+```bash
+ssh tailscale-etet-derper -- sudo snap logs derper
+```
+
+Expected output:
+
+```text
+2025-04-04T06:12:24Z derper.derper[7344]: 2025/04/04 06:12:24 derp: 4.196.104.39:1034: client nodekey:10c7943005db1d1796f357594f1267cbfba2d30873699630a4b01a6dff7b326d rejected: peer nodekey:10c7943005db1d1796f357594f1267cbfba2d30873699630a4b01a6dff7b326d not authorized (not found in local tailscaled)
+2025-04-04T06:12:24Z derper.derper[7344]: 2025/04/04 06:12:24 derp: 4.196.107.208:1029: client nodekey:576cfb3e1df4805da9f495f86ef2a8dd740cf9368f17551f96b2fa079a835f61 rejected: peer nodekey:576cfb3e1df4805da9f495f86ef2a8dd740cf9368f17551f96b2fa079a835f61 not authorized (not found in local tailscaled)
+...
+```
+
+##### Reset
+
+Log tailscale back in on the derper machine:
+
+```bash
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user derper)"
+echo "$KEY"
+
+ssh tailscale-etet-derper -- <<EOF
+set -x
+sudo tailscale up --advertise-tags tag:derper --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
+tailscale status
+tailscale debug derp-map
+EOF
+
+```
+
+Attempt to SSH from user-2 to internal-1 again:
+
+```bash
+ssh tailscale-etet-user-2 -- $'ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no internal-1 -- echo $(hostname) to \'$(hostname)\''
+```
+
+Verify it succeeds now:
+
+```text
+internal-2 to internal-1
+```
+
+TODO: test the case where tailscale is not connected and derper is _not_ in verify-clients mode.
 
 ### Test policies
 
