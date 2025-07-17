@@ -37,6 +37,9 @@ description: |
 
   This snap is maintained by Canonical, and is not necessarily endorsed or officially maintained by the upstream developers.
 
+# AppArmor override for Tailscale SSH support:
+# See snap/hooks/security-override.apparmor for custom AppArmor rules to allow /usr/bin/login execution and SSH host key access.
+
 platforms:
   amd64:
   arm64:
