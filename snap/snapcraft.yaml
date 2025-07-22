@@ -4,6 +4,7 @@ version: 1.84.0
 license: BSD-3-Clause
 grade: stable
 confinement: strict
+icon: snap/local/tailscale-512px.png
 contact: solutions-engineering@lists.canonical.com
 issues: https://github.com/canonical/tailscale-snap/issues
 source-code: https://github.com/canonical/tailscale-snap
