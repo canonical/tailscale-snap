@@ -1,6 +1,6 @@
 name: tailscale
 base: core24
-version: 1.84.0
+version: 1.84.3
 license: BSD-3-Clause
 grade: stable
 confinement: strict
