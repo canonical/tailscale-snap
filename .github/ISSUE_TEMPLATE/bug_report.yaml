@@ -1,0 +1,49 @@
+name: Bug Report
+description: Create a report to help us improve the snap
+labels:
+  - kind/bug
+  - needs-triage
+body:
+  - type: textarea
+    id: Description
+    attributes:
+      label: Description
+      description: "Please describe the unexpected behaviour: "
+      placeholder: ex. "snap service fails to start"
+    validations:
+      required: true
+
+  - type: input
+    id: Snap-Version
+    attributes:
+      label: Snap version
+      description: "What version of the snap are you using?"
+      placeholder: ex. latest/stable
+    validations:
+      required: true
+
+  - type: textarea
+    id: Expected-Behaviour
+    attributes:
+      label: Expected behaviour
+      description: "Describe what you expected to happen: "
+      placeholder: ex. "snap service starts successfully"
+    validations:
+      required: true
+
+  - type: textarea
+    id: Reproduction-Steps
+    attributes:
+      label: "Reproduce / Test"
+      description: "Steps to reproduce the unexpected behaviour: "
+      placeholder: ex. "`snap install ...` and `snap start ...`"
+    validations:
+      required: true
+
+  - type: textarea
+    id: Info-Notes
+    attributes:
+      label: "Notes & References"
+      description: "Please add anything to help diagnose the issue e.g. debug logs, systemctl logs, etc."
+    validations:
+      required: false
