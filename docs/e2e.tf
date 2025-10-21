@@ -19,6 +19,18 @@ variable "ssh_key" {
   description = "public ssh key to be added to all created VMs (for the 'ubuntu' user)"
 }
 
+variable "dns_prefix" {
+  type        = string
+  description = "unique prefix for DNS labels to avoid conflicts in public domain names"
+  default     = ""
+}
+
+variable "vm_size" {
+  type        = string
+  description = "Azure VM size to use for all VMs"
+  default     = "Standard_B1s"
+}
+
 resource "azurerm_resource_group" "tailscale_testing" {
   name     = "tailscale"
   location = "Australia East"
@@ -52,11 +64,9 @@ resource "azurerm_subnet" "vnet_subnet_2" {
   address_prefixes     = ["10.1.2.0/24"]
 }
 
-# TODO: these domain names are public (derper and headscale) so there is chance of conflict if two people deploy this testing simultaneously or simply the domain name is taken - maybe these should be variables for this document and terraform?
-
 resource "azurerm_public_ip" "derper" {
   name                = "derper"
-  domain_name_label   = "derper"
+  domain_name_label   = var.dns_prefix != "" ? "${var.dns_prefix}-derper" : "derper"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
   allocation_method   = "Static"
@@ -162,7 +172,7 @@ resource "azurerm_linux_virtual_machine" "derper" {
   name                = "derper"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
-  size                = "Standard_DS1_v2"
+  size                = var.vm_size
   admin_username      = "ubuntu"
   network_interface_ids = [
     azurerm_network_interface.derper.id,
@@ -189,7 +199,7 @@ resource "azurerm_linux_virtual_machine" "derper" {
 
 resource "azurerm_public_ip" "headscale" {
   name                = "headscale"
-  domain_name_label   = "headscale"
+  domain_name_label   = var.dns_prefix != "" ? "${var.dns_prefix}-headscale" : "headscale"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
   allocation_method   = "Static"
@@ -259,7 +269,7 @@ resource "azurerm_linux_virtual_machine" "headscale" {
   name                = "headscale"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
-  size                = "Standard_DS1_v2"
+  size                = var.vm_size
   admin_username      = "ubuntu"
   network_interface_ids = [
     azurerm_network_interface.headscale.id,
@@ -355,7 +365,7 @@ resource "azurerm_linux_virtual_machine" "tailscale_jumpbox_1" {
   name                = "tailscale-jumpbox-1"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
-  size                = "Standard_DS1_v2"
+  size                = var.vm_size
   admin_username      = "ubuntu"
   network_interface_ids = [
     azurerm_network_interface.tailscale_jumpbox_1.id,
@@ -384,7 +394,7 @@ resource "azurerm_linux_virtual_machine" "tailscale_jumpbox_2" {
   name                = "tailscale-jumpbox-2"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
-  size                = "Standard_DS1_v2"
+  size                = var.vm_size
   admin_username      = "ubuntu"
   network_interface_ids = [
     azurerm_network_interface.tailscale_jumpbox_2.id,
@@ -429,7 +439,7 @@ resource "azurerm_linux_virtual_machine" "internal_1" {
   name                = "internal-1"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
-  size                = "Standard_DS1_v2"
+  size                = var.vm_size
   admin_username      = "ubuntu"
   network_interface_ids = [
     azurerm_network_interface.internal_1.id,
@@ -474,7 +484,7 @@ resource "azurerm_linux_virtual_machine" "user_1" {
   name                = "user-1"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
-  size                = "Standard_DS1_v2"
+  size                = var.vm_size
   admin_username      = "ubuntu"
   network_interface_ids = [
     azurerm_network_interface.user_1.id,
@@ -519,7 +529,7 @@ resource "azurerm_linux_virtual_machine" "user_2" {
   name                = "user-2"
   resource_group_name = azurerm_resource_group.tailscale_testing.name
   location            = azurerm_resource_group.tailscale_testing.location
-  size                = "Standard_DS1_v2"
+  size                = var.vm_size
   admin_username      = "ubuntu"
   network_interface_ids = [
     azurerm_network_interface.user_2.id,
