@@ -35,6 +35,36 @@ cd docs
 terraform apply -var "ssh_key=YOUR PUBLIC SSH KEY CONTENTS"
 ```
 
+> **Note 1**:
+>If you encounter errors related to resource name uniqueness, the error message will include details such as:
+>```text
+>│ Error: updating Public I P Address (Subscription: "466ee356-ce1f-11ef-bf94-db2a042e145c"
+>│ Resource Group Name: "tailscale"
+>│ Public I P Addresses Name: "derper"): performing CreateOrUpdate: unexpected status 400 (400 Bad Request) with error:
+>DnsRecordIsReserved: DNS record derper.australiaeast.cloudapp.azure.com is already reserved by another resource.
+>```
+>then this means the domain name is already taken. You will need to provide a unique dns prefix variable to terraform like so:
+>```bash
+>terraform destroy -auto-approve # destroy previous failed attempt
+>terraform apply \
+>    -var "ssh_key=YOUR PUBLIC SSH KEY CONTENTS" \
+>    -var "dns_prefix=YOUR_UNIQUE_PREFIX"
+>```
+>After this, the headscale and derper domain names will be prefixed with `YOUR_UNIQUE_PREFIX-`.
+>For example, if `dns_prefix=test123`, then the derper domain name will be `test123-derper.australiaeast.cloudapp.azure.com`
+>and headscale domain name will be `test123-headscale.australiaeast.cloudapp.azure.com`. **You will need to update any references to these domain names in the rest of this document accordingly**.
+>
+
+>**Note 2**:
+>The default VM size used is a lightweight [`Standard_B1s`](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/general-purpose/bv1-series). If you want to use a different VM size, you can provide the `vm_size` variable, for example to use the `Standard_DS1_v2`:
+>
+>```bash
+>terraform apply \
+>    -var="ssh_key=YOUR PUBLIC SSH KEY CONTENTS" \
+>    -var="vm_size=Standard_DS1_v2"
+>```
+>
+
 Terraform will output an ssh config snippet,
 with the configuration required to be able to ssh to the machines.
 Please copy this to your ssh config in order to connect to the machines for the rest of the steps.
