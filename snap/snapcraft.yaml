@@ -58,7 +58,7 @@ slots:
   # Share the socket directory to support the case where another snap needs to communicate with tailscaled.
   socket:
     interface: content
-    content: writable-data
+    content: socket-directory
     write:
       - $SNAP_COMMON/socket
 
