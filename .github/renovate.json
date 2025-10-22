@@ -1,0 +1,43 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "timezone": "UTC",
+  "schedule": [
+    "before 1am on Monday"
+  ],
+  "labels": [
+    "dependencies",
+    "upstream-release"
+  ],
+  "prConcurrentLimit": 1,
+  "prHourlyLimit": 2,
+  "commitMessagePrefix": "Bump to",
+  "commitMessageAction": "",
+  "commitMessageExtra": "",
+  "commitMessageTopic": "Tailscale {{newVersion}}",
+  "regexManagers": [
+    {
+      "fileMatch": [
+        "^snap/snapcraft\\.yaml$"
+      ],
+      "matchStrings": [
+        "version:\\s*(?<currentValue>\\S+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "tailscale/tailscale",
+      "extractVersionTemplate": "^v?(?<version>.*)$"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchDatasources": ["github-releases"],
+      "matchPackageNames": ["tailscale/tailscale"],
+      "commitMessageTopic": "Tailscale {{newVersion}}",
+      "semanticCommits": "disabled",
+      "automerge": false,
+      "stabilityDays": 0
+    }
+  ]
+}
