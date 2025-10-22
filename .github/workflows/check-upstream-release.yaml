@@ -1,0 +1,141 @@
+name: Check Upstream Tailscale Release
+
+on:
+  # Run weekly on Monday at 12:00 AM UTC
+  schedule:
+    - cron: '0 0 * * 1'
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get current snap version
+        id: current-version
+        run: |
+          CURRENT_VERSION=$(grep -E '^version:' snap/snapcraft.yaml | awk '{print $2}')
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current snap version: $CURRENT_VERSION"
+
+      - name: Get latest Tailscale release
+        id: upstream-version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Fetch release data using GitHub CLI
+          RELEASE_DATA=$(gh release view --repo tailscale/tailscale --json tagName,url,body,publishedAt)
+
+          LATEST_RELEASE=$(echo "$RELEASE_DATA" | jq -r '.tagName')
+          # Remove 'v' prefix if present
+          LATEST_VERSION=${LATEST_RELEASE#v}
+          RELEASE_URL=$(echo "$RELEASE_DATA" | jq -r '.url')
+          RELEASE_NOTES=$(echo "$RELEASE_DATA" | jq -r '.body')
+          RELEASE_DATE=$(echo "$RELEASE_DATA" | jq -r '.publishedAt')
+
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "release_url=$RELEASE_URL" >> $GITHUB_OUTPUT
+          echo "release_date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+
+          # Save release notes to a file for multi-line handling
+          echo "$RELEASE_NOTES" > /tmp/release_notes.txt
+
+          echo "Latest upstream version: $LATEST_VERSION"
+
+      - name: Compare versions
+        id: compare
+        run: |
+          CURRENT="${{ steps.current-version.outputs.version }}"
+          LATEST="${{ steps.upstream-version.outputs.version }}"
+
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "No new release. Current: $CURRENT, Latest: $LATEST"
+          else
+            echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "New release detected! Current: $CURRENT, Latest: $LATEST"
+          fi
+
+      - name: Check if issue already exists
+        if: steps.compare.outputs.new_release == 'true'
+        id: check-issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LATEST_VERSION="${{ steps.upstream-version.outputs.version }}"
+          ISSUE_TITLE="Bump to Tailscale $LATEST_VERSION"
+
+          # Search for existing open issues with the same title
+          EXISTING_ISSUE=$(gh issue list \
+            --search "\"$ISSUE_TITLE\" in:title" \
+            --state open \
+            --json number \
+            --jq '.[0].number // ""')
+
+          if [ -n "$EXISTING_ISSUE" ]; then
+            echo "issue_exists=true" >> $GITHUB_OUTPUT
+            echo "issue_number=$EXISTING_ISSUE" >> $GITHUB_OUTPUT
+            echo "Issue already exists: #$EXISTING_ISSUE"
+          else
+            echo "issue_exists=false" >> $GITHUB_OUTPUT
+            echo "No existing issue found"
+          fi
+
+      - name: Create issue for new release
+        if: steps.compare.outputs.new_release == 'true' && steps.check-issue.outputs.issue_exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURRENT_VERSION="${{ steps.current-version.outputs.version }}"
+          LATEST_VERSION="${{ steps.upstream-version.outputs.version }}"
+          RELEASE_URL="${{ steps.upstream-version.outputs.release_url }}"
+          RELEASE_DATE="${{ steps.upstream-version.outputs.release_date }}"
+
+          # Read release notes from file
+          RELEASE_NOTES=$(cat /tmp/release_notes.txt)
+
+          # Create issue body from template
+          cp .github/ISSUE_TEMPLATE/upstream-release-issue.md /tmp/issue_body.md
+
+          # Replace placeholders in the template
+          sed -i "s|{{CURRENT_VERSION}}|$CURRENT_VERSION|g" /tmp/issue_body.md
+          sed -i "s|{{LATEST_VERSION}}|$LATEST_VERSION|g" /tmp/issue_body.md
+          sed -i "s|{{RELEASE_DATE}}|$RELEASE_DATE|g" /tmp/issue_body.md
+          sed -i "s|{{RELEASE_URL}}|$RELEASE_URL|g" /tmp/issue_body.md
+          sed -i "s|{{REPOSITORY}}|${{ github.repository }}|g" /tmp/issue_body.md
+
+          # Replace release notes (using a different delimiter to avoid conflicts)
+          sed -i "s|{{RELEASE_NOTES}}|$RELEASE_NOTES|g" /tmp/issue_body.md
+
+          # Create the issue
+          gh issue create \
+            --title "Bump to Tailscale $LATEST_VERSION" \
+            --body-file /tmp/issue_body.md \
+            --label "upstream-release,version-bump"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Upstream Release Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current snap version:** ${{ steps.current-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest upstream version:** ${{ steps.upstream-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New release detected:** ${{ steps.compare.outputs.new_release }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.compare.outputs.new_release }}" = "true" ]; then
+            if [ "${{ steps.check-issue.outputs.issue_exists }}" = "true" ]; then
+              echo "- **Action taken:** Issue already exists (#${{ steps.check-issue.outputs.issue_number }})" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Action taken:** Created new issue" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Action taken:** No action needed, snap is up to date" >> $GITHUB_STEP_SUMMARY
+          fi
+
