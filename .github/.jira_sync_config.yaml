@@ -16,6 +16,7 @@ settings:
   status_mapping:
     opened: Untriaged
     closed: done
+    not_planned: rejected
 
   # (Optional) Jira project components that should be attached to the created issue
   # Component names are case-sensitive
