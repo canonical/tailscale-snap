@@ -24,7 +24,7 @@ jobs:
       matrix:
         runs-on: [[ubuntu-24.04], [self-hosted, jammy, ARM64]]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0  # Complete git history is required to generate the version from git tags.
 
@@ -32,7 +32,7 @@ jobs:
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
       - name: Download the built snap from check workflow
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: snap_${{ env.SYSTEM_ARCH }}
 
