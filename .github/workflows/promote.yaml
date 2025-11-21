@@ -19,7 +19,7 @@ jobs:
     name: Promote snap
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Snapcraft install
         run: sudo snap install --classic snapcraft
       - name: Get snap name
