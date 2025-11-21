@@ -24,7 +24,7 @@ jobs:
       matrix:
         runs-on: [[ubuntu-24.04], [self-hosted, jammy, ARM64]]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Complete git history is required to generate the version from git tags.
 
