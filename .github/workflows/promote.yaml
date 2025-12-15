@@ -17,7 +17,7 @@ on:
 jobs:
   promote-snap:
     name: Promote snap
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - name: Snapcraft install
