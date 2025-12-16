@@ -32,7 +32,7 @@ jobs:
         run: echo "SYSTEM_ARCH=$(uname -m)" >> $GITHUB_ENV
 
       - name: Download the built snap from check workflow
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: snap_${{ env.SYSTEM_ARCH }}
 
