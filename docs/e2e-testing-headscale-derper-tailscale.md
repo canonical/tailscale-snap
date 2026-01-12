@@ -201,9 +201,9 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
 // reference docs: https://headscale.net/stable/ref/acls/
 {
   "groups": {
-    "group:users": ["user1", "user2"],
-    "group:internal": ["internal"],
-    "group:derper": ["derper"],
+    "group:users": ["user1@", "user2@"],
+    "group:internal": ["internal@"],
+    "group:derper": ["derper@"],
   },
   "tagOwners": {
     "tag:internal": ["group:internal"],
@@ -222,7 +222,7 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
     // ACL02 user1 is an admin, and can access derper machines, and other ports on internal servers
     {
       "action": "accept",
-      "src": ["user1"],
+      "src": ["user1@"],
       "dst": [
         "tag:derper:*",
         "tag:internal:*",
@@ -297,7 +297,8 @@ So here we configure Tailscale on the derper machine to support this.
 On derper, install Tailscale and authenticate to the Headscale server using a preauth key with the `derper` user and tag `derper`:
 
 ```bash
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user derper)"
+DERPER_USER_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="derper") | .id')"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID)"
 echo "$KEY"
 
 ssh tailscale-etet-derper -- <<EOF
@@ -329,7 +330,8 @@ On internal-1, install Tailscale and authenticate to the Headscale server using 
 In this environment, this simulates a jumpbox machine within a locked down datacenter (for example), that users such as operators and admins need to access.
 
 ```bash
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user internal)"
+INTERNAL_USER_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="internal") | .id')"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $INTERNAL_USER_ID)"
 echo "$KEY"
 
 ssh tailscale-etet-internal-1 -- <<EOF
@@ -364,7 +366,8 @@ On user-1, install Tailscale and authenticate to the Headscale server using a pr
 In this environment, this simulates an end user machine like a laptop, owned by an admin user.
 
 ```bash
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user user1)"
+USER1_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="user1") | .id')"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $USER1_ID)"
 echo "$KEY"
 
 ssh tailscale-etet-user-1 -- <<EOF
@@ -825,7 +828,8 @@ Expected output:
 Log tailscale back in on the derper machine:
 
 ```bash
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user derper)"
+DERPER_USER_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="derper") | .id')"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID)"
 echo "$KEY"
 
 ssh tailscale-etet-derper -- <<EOF
@@ -916,7 +920,8 @@ user-2 to internal-1
 Log tailscale back in on the derper machine:
 
 ```bash
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user derper)"
+DERPER_USER_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="derper") | .id')"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID)"
 echo "$KEY"
 
 ssh tailscale-etet-derper -- <<EOF
