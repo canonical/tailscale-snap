@@ -70,7 +70,7 @@ apps:
       - network-bind
   tailscaled:
     # NOTE: cannot use layout to support default socket location, because /var/run is not allowed for layout.
-    command: bin/tailscaled --socket $SNAP_COMMON/socket/tailscaled.sock --statedir $SNAP_COMMON --verbose 10
+    command: bin/tailscaled-wrapper.sh --socket $SNAP_COMMON/socket/tailscaled.sock --statedir $SNAP_COMMON --verbose 10
     daemon: simple
     plugs:
       - firewall-control
@@ -89,3 +89,9 @@ parts:
     override-build: |
       ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscale
       ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscaled
+
+  tailscaled-wrapper:
+    plugin: dump
+    source: snap/local
+    organize:
+      tailscaled-wrapper.sh: bin/tailscaled-wrapper.sh
