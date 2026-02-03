@@ -42,6 +42,26 @@ Now you can manage tailscale with the `tailscale` command:
 tailscale status
 ```
 
+## Configuration
+
+### Proxy settings
+
+To configure proxy settings for `tailscaled`, use `snap set`, for example:
+
+```
+sudo snap set tailscale https-proxy=http://proxy.example.com:3128
+sudo snap set tailscale http-proxy=http://proxy.example.com:3128
+sudo snap set tailscale no-proxy=localhost,127.0.0.1
+```
+
+To remove a proxy setting:
+
+```
+sudo snap unset tailscale https-proxy
+```
+
+The service automatically restarts when proxy settings are changed.
+
 ## Integration with other snaps
 
 Other snaps can access tailscaled via its unix socket through the `tailscale:socket` slot.

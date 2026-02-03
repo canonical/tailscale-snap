@@ -1,0 +1,6 @@
+#!/bin/sh -e
+
+# Restart tailscaled service to apply new configuration
+if snapctl services tailscale.tailscaled | grep -q "active"; then
+    snapctl restart tailscale.tailscaled
+fi

@@ -26,6 +26,14 @@ description: |
   * `tailscale file cp` and `tailscale cert` will only work with file paths accessible to the snap, for example `/home/ubuntu/snap/tailscale/common/foo.txt`. See https://snapcraft.io/docs/data-locations for a full list of paths.
   * `tailscale drive share` will not work (the client command succeeds, the share is registered, but you will see errors in tailscaled logs and the share will not be accessible).
 
+  **Proxy Configuration**
+
+  To route tailscaled traffic through a proxy:
+
+  `sudo snap set tailscale https-proxy=<proxy-url>`
+
+  See https://github.com/canonical/tailscale-snap for more configuration options.
+
   **Security**
 
   See https://github.com/canonical/tailscale-snap/blob/main/docs/security-reference.md
@@ -69,8 +77,9 @@ apps:
       - network
       - network-bind
   tailscaled:
+    # Deprecate the wrapper script when env-injection extension becomes stable. See: https://documentation.ubuntu.com/snapcraft/latest/how-to/extensions/use-the-env-injector-extension/
     # NOTE: cannot use layout to support default socket location, because /var/run is not allowed for layout.
-    command: bin/tailscaled --socket $SNAP_COMMON/socket/tailscaled.sock --statedir $SNAP_COMMON --verbose 10
+    command: bin/tailscaled-wrapper.sh --socket $SNAP_COMMON/socket/tailscaled.sock --statedir $SNAP_COMMON --verbose 10
     daemon: simple
     plugs:
       - firewall-control
@@ -89,3 +98,9 @@ parts:
     override-build: |
       ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscale
       ./build_dist.sh -p $CRAFT_PARALLEL_BUILD_COUNT -o $CRAFT_PART_INSTALL/bin/ ./cmd/tailscaled
+
+  tailscaled-wrapper:
+    plugin: dump
+    source: snap/local
+    organize:
+      tailscaled-wrapper.sh: bin/tailscaled-wrapper.sh
