@@ -1,0 +1,5 @@
+# Allow tailscaled to execute /usr/bin/login for Tailscale SSH
+/usr/bin/login Px,
+
+# Allow reading SSH host keys (if needed)
+/etc/ssh/ssh_host_*_key r,
