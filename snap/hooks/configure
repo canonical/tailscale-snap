@@ -1,5 +1,12 @@
 #!/bin/sh -e
 
+# Validate no-logs-no-support value
+NO_LOGS_NO_SUPPORT="$(snapctl get no-logs-no-support)"
+if [ -n "$NO_LOGS_NO_SUPPORT" ] && [ "$NO_LOGS_NO_SUPPORT" != "true" ] && [ "$NO_LOGS_NO_SUPPORT" != "false" ]; then
+    echo "no-logs-no-support must be 'true' or 'false', got: '${NO_LOGS_NO_SUPPORT}'" >&2
+    exit 1
+fi
+
 # Restart tailscaled service to apply new configuration
 if snapctl services tailscale.tailscaled | grep -q "active"; then
     snapctl restart tailscale.tailscaled
