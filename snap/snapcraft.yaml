@@ -34,6 +34,14 @@ description: |
 
   See https://github.com/canonical/tailscale-snap for more configuration options.
 
+  **Disable Logging**
+
+  When using a custom coordination server (e.g. Headscale), disable logs sent to Tailscale:
+
+  `sudo snap set tailscale no-logs-no-support=true`
+
+  Note: this also disables Tailscale technical support.
+
   **Security**
 
   See https://github.com/canonical/tailscale-snap/blob/main/docs/security-reference.md

@@ -21,4 +21,13 @@ if [ -n "$NO_PROXY" ]; then
     export no_proxy="$NO_PROXY"
 fi
 
-exec "$SNAP/bin/tailscaled" "$@"
+# Get no-logs-no-support setting
+NO_LOGS_NO_SUPPORT="$(snapctl get no-logs-no-support)"
+
+# Optional flags
+EXTRA_FLAGS=""
+if [ "$NO_LOGS_NO_SUPPORT" = "true" ]; then
+    EXTRA_FLAGS="--no-logs-no-support"
+fi
+
+exec "$SNAP/bin/tailscaled" $EXTRA_FLAGS "$@"
