@@ -1,0 +1,34 @@
+{
+  "groups": {
+    "group:users": ["user1@", "user2@"],
+    "group:internal": ["internal@"],
+    "group:derper": ["derper@"],
+  },
+  "tagOwners": {
+    "tag:internal": ["group:internal"],
+    "tag:derper": ["group:derper"],
+  },
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["group:users"],
+      "dst": ["tag:internal:22", "tag:derper:22"],
+    },
+    {
+      "action": "accept",
+      "src": ["user1@"],
+      "dst": ["tag:derper:*", "tag:internal:*"],
+    },
+    {
+      "action": "accept",
+      "src": ["group:internal"],
+      "dst": ["group:internal:*"],
+    },
+    {
+      "action": "accept",
+      "src": ["*"],
+      "proto": "icmp",
+      "dst": ["*:*"],
+    },
+  ],
+}
