@@ -18,16 +18,15 @@ The host must provide:
 - internet access for the Ubuntu image and package installation
 - enough capacity for five LXD containers
 
-Place exactly one artifact matching each pattern in the repository root:
+Build the local snap under test and place exactly one matching artifact in the
+repository root:
 
 ```text
 tailscale_*.snap
-headscale_*.snap
-derper_*.snap
 ```
 
-The target does not build these artifacts. Build or obtain them before
-running the test. Duplicate matching files also cause the target to fail.
+Headscale and Derper install from `latest/edge`. Set an absolute
+`HEADSCALE_TEST_SNAP` or `DERPER_TEST_SNAP` path to test local artifacts instead.
 
 ## Run the test
 
@@ -38,8 +37,8 @@ tox -e e2e
 ```
 
 The target initializes Terraform, creates the LXD environment, installs the
-three candidate snaps, runs the tests, and destroys the environment. Cleanup
-runs after both success and failure.
+local candidate snap and Headscale and Derper from `latest/edge`, runs the
+tests, and destroys the environment. Cleanup runs after both success and failure.
 
 To retain the environment for inspection:
 
@@ -60,8 +59,7 @@ KEEP_ENV=1 REUSE_ENV=1 tox -e e2e
 ```
 
 `REUSE_ENV=1` is only for debugging. It skips provisioning and can hide setup
-failures or reuse state left by an interrupted test. The three snap artifacts
-are still required because the tox runner validates them before pytest starts.
+failures or reuse state left by an interrupted test.
 
 ## Cleanup
 
@@ -107,7 +105,7 @@ between users and internal services through the custom DERP server.
 
 The fixture:
 
-- installs all three candidate snaps with `--dangerous`
+- installs the local candidate snap with `--dangerous` and Headscale and Derper from `latest/edge`
 - connects interfaces required by dangerous snap installation
 - creates a local certificate authority and manual TLS certificates
 - configures Headscale with MagicDNS, a policy, and one custom DERP region

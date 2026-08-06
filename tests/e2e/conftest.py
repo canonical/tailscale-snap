@@ -14,8 +14,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 E2E_DIR = Path(__file__).resolve().parent
+ROOT_DIR = E2E_DIR.parent.parent
 CONFIG_DIR = E2E_DIR / "config"
 HOSTS = ("headscale", "derper", "internal-1", "user-1", "user-2")
 TAILSCALE_HOSTS = ("derper", "internal-1", "user-1", "user-2")
@@ -26,13 +28,25 @@ PRODUCTS = {
     "user-1": ("tailscale",),
     "user-2": ("tailscale",),
 }
+KEEP_ENV = os.environ.get("KEEP_ENV") == "1"
+REUSE_ENV = os.environ.get("REUSE_ENV") == "1"
 
 
 @dataclass
-class E2EContext:
+class TFContext:
     project: str
     topology: dict[str, Any]
+
+
+@dataclass
+class E2EContext(TFContext):
     private_dir: Path
+
+
+@dataclass
+class SnapArtifact:
+    path: str
+    channel: str | None = None
 
 
 def run(
@@ -47,7 +61,7 @@ def run(
     )
     if check and result.returncode:
         cmd = " ".join(str(part) for part in command)
-        raise RuntimeError(f"command failed ({result.returncode}): {cmd}")
+        raise RuntimeError(f"command failed ({result.returncode}): {cmd}\n{result.stderr}")
     return result
 
 
@@ -134,16 +148,23 @@ def wait_tailscale(project: str, host: str) -> None:
     raise AssertionError(f"timed out waiting for Tailscale Running on {host}")
 
 
-def install_snaps(project: str, artifacts: dict[str, Path]) -> None:
+def install_snaps(project: str, artifacts: dict[str, SnapArtifact]) -> None:
     for host, products in PRODUCTS.items():
         for product in products:
             artifact = artifacts[product]
-            remote_snap = f"/tmp/{artifact.name}"
-            push(project, host, str(artifact), remote_snap, "0600")
-            try:
-                lxc_exec(project, host, ["snap", "install", "--dangerous", remote_snap])
-            finally:
-                lxc_exec(project, host, ["rm", "-f", remote_snap], check=False)
+            if artifact.channel is None:
+                remote_snap = f"/tmp/{product}"
+                push(project, host, artifact.path, remote_snap, "0600")
+                try:
+                    lxc_exec(project, host, ["snap", "install", "--dangerous", remote_snap])
+                finally:
+                    lxc_exec(project, host, ["rm", "-f", remote_snap], check=False)
+            else:
+                lxc_exec(
+                    project,
+                    host,
+                    ["snap", "install", artifact.path, f"--channel={artifact.channel}"],
+                )
 
     for host in TAILSCALE_HOSTS:
         for plug in (
@@ -483,28 +504,53 @@ def configure_ssh(project: str, private_dir: Path) -> None:
         push(project, host, str(public), "/root/.ssh/authorized_keys", "0600")
 
 
+def get_snap_artifact(snap: str) -> SnapArtifact:
+    path_from_env = os.environ.get(f"{snap.upper()}_TEST_SNAP")
+    if path_from_env:
+        if not Path(path_from_env).is_absolute():
+            pytest.fail(f"{snap.upper()}_TEST_SNAP env variable is not set to an absolute path")
+        return SnapArtifact(path=path_from_env)
+
+    manifest = yaml.safe_load((ROOT_DIR / "snap/snapcraft.yaml").read_text())
+    local_snap_name = manifest.get("name") if isinstance(manifest, dict) else None
+    if not isinstance(local_snap_name, str):
+        pytest.fail("snap/snapcraft.yaml has no name field")
+
+    if snap != local_snap_name:
+        return SnapArtifact(path=snap, channel="latest/edge")
+
+    snaps = list(ROOT_DIR.glob(f"{snap}_*.snap"))
+    if len(snaps) != 1:
+        pytest.fail(f"Expected exactly one {snap}_*.snap artifact, found {len(snaps)}")
+    return SnapArtifact(path=str(snaps[0]))
+
+
 @pytest.fixture(scope="session")
-def e2e() -> Generator[E2EContext, None, None]:
-    reuse_env = os.environ.get("REUSE_ENV") == "1"
+def artifacts() -> Generator[dict[str, SnapArtifact], None, None]:
+    derper = get_snap_artifact("derper")
+    tailscale = get_snap_artifact("tailscale")
+    headscale = get_snap_artifact("headscale")
 
-    artifacts: dict[str, Path] = {}
-    if not reuse_env:
-        derper_snap = os.environ.get("DERPER_TEST_SNAP")
-        tailscale_snap = os.environ.get("TAILSCALE_TEST_SNAP")
-        headscale_snap = os.environ.get("HEADSCALE_TEST_SNAP")
+    yield {
+        "derper": derper,
+        "tailscale": tailscale,
+        "headscale": headscale,
+    }
 
-        if not derper_snap or not Path(derper_snap).is_absolute():
-            pytest.fail("DERPER_TEST_SNAP env variable is not set to an absolute path")
-        if not tailscale_snap or not Path(tailscale_snap).is_absolute():
-            pytest.fail("TAILSCALE_TEST_SNAP env variable is not set to an absolute path")
-        if not headscale_snap or not Path(headscale_snap).is_absolute():
-            pytest.fail("HEADSCALE_TEST_SNAP env variable is not set to an absolute path")
 
-        artifacts = {
-            "derper": Path(derper_snap),
-            "tailscale": Path(tailscale_snap),
-            "headscale": Path(headscale_snap),
-        }
+@pytest.fixture(scope="session")
+def terraform(artifacts: dict[str, SnapArtifact]) -> Generator[TFContext, None, None]:
+    if REUSE_ENV and not KEEP_ENV:
+        pytest.fail("REUSE_ENV=1 requires KEEP_ENV=1 to preserve the existing environment")
+
+    terraform_dir = ROOT_DIR / ".terraform/e2e"
+    terraform_state_path = terraform_dir / "terraform.tfstate"
+    terraform_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["TF_DATA_DIR"] = str(terraform_dir / "data")
+
+    run(["terraform", f"-chdir={E2E_DIR}", "init", f"-backend-config=path={terraform_state_path}"])
+    if not REUSE_ENV:
+        run(["terraform", f"-chdir={E2E_DIR}", "apply", "-auto-approve"])
 
     topology: dict[str, Any] = json.loads(
         run(["terraform", f"-chdir={E2E_DIR}", "output", "-json", "topology"]).stdout
@@ -515,14 +561,29 @@ def e2e() -> Generator[E2EContext, None, None]:
     if not project:
         pytest.fail("Terraform topology is missing project_name")
 
+    try:
+        yield TFContext(project=project, topology=topology)
+    finally:
+        if not KEEP_ENV:
+            run(["terraform", f"-chdir={E2E_DIR}", "destroy", "-auto-approve"])
+
+
+@pytest.fixture(scope="session")
+def e2e(
+    terraform: TFContext, artifacts: dict[str, SnapArtifact]
+) -> Generator[E2EContext, None, None]:
     with tempfile.TemporaryDirectory(prefix="tailscale-snap-e2e-") as temporary:
         private_dir = Path(temporary)
         private_dir.chmod(0o700)
-        if not reuse_env:
-            install_snaps(project, artifacts)
-            configure_certificates(project, private_dir)
-            configure_hosts(project, topology, private_dir)
-            configure_services(project)
-            configure_tailnet(project, private_dir)
-            configure_ssh(project, private_dir)
-        yield E2EContext(project=project, topology=topology, private_dir=private_dir)
+        if not REUSE_ENV:
+            install_snaps(terraform.project, artifacts)
+            configure_certificates(terraform.project, private_dir)
+            configure_hosts(terraform.project, terraform.topology, private_dir)
+            configure_services(terraform.project)
+            configure_tailnet(terraform.project, private_dir)
+            configure_ssh(terraform.project, private_dir)
+        yield E2EContext(
+            project=terraform.project,
+            topology=terraform.topology,
+            private_dir=private_dir,
+        )
