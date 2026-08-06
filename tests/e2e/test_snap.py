@@ -100,6 +100,10 @@ def _restore_derper_login(project: str, private_dir: Path) -> None:
 
 
 def test_custom_derp(e2e: E2EContext) -> None:
+    """Confirm Headscale distributes only the configured local DERP region.
+
+    The region must contain the Derper hostname used by the test environment.
+    """
     project = e2e.project
     mapping = json.loads(lxc_exec(project, "user-2", ["tailscale", "debug", "derp-map"]).stdout)
     assert set(mapping["Regions"]) == {"900"}
@@ -108,6 +112,10 @@ def test_custom_derp(e2e: E2EContext) -> None:
 
 
 def test_magicdns(e2e: E2EContext) -> None:
+    """Confirm MagicDNS resolves both peer name forms to its Tailscale IP.
+
+    This covers the Headscale DNS service and its configured search domain.
+    """
     project = e2e.project
     status = json.loads(lxc_exec(project, "internal-1", ["tailscale", "status", "--json"]).stdout)
     overlay_ip = next(address for address in status["TailscaleIPs"] if "." in address)
@@ -118,6 +126,11 @@ def test_magicdns(e2e: E2EContext) -> None:
 
 
 def test_underlay_isolation_and_overlay_ssh(e2e: E2EContext) -> None:
+    """Confirm Tailscale provides the only path from user-1 to internal-1.
+
+    Direct SSH to the isolated services network fails while Tailscale is down;
+    SSH bound to tailscale0 succeeds after it is restored.
+    """
     project = e2e.project
     try:
         lxc_exec(project, "user-1", ["tailscale", "down"])
@@ -140,6 +153,11 @@ def test_underlay_isolation_and_overlay_ssh(e2e: E2EContext) -> None:
 
 
 def test_acl_and_port_rules(e2e: E2EContext) -> None:
+    """Confirm representative Headscale ACL rules apply over the Tailscale interface.
+
+    user-2 can SSH to internal-1 but cannot reach user-1, Derper cannot reach
+    internal-1, ICMP remains allowed, and only user-1 can access Derper HTTP.
+    """
     project = e2e.project
     allowed = _ssh(project, "user-2", "internal-1")
     assert allowed.returncode == 0, allowed.stderr
@@ -172,6 +190,12 @@ def test_acl_and_port_rules(e2e: E2EContext) -> None:
 
 
 def test_derp_relay_and_verify_client_states(e2e: E2EContext) -> None:
+    """Confirm DERP relay and verify-clients behavior in its key service states.
+
+    Traffic relays when direct paths are unavailable and the verifier is healthy,
+    fails closed without the verifier socket or tailnet login, and works again
+    when verification is explicitly disabled.
+    """
     project = e2e.project
     private_dir = e2e.private_dir
     try:
