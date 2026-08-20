@@ -550,7 +550,7 @@ def terraform(artifacts: dict[str, SnapArtifact]) -> Generator[TFContext, None, 
 
     run(["terraform", f"-chdir={E2E_DIR}", "init", f"-backend-config=path={terraform_state_path}"])
     if not REUSE_ENV:
-        run(["terraform", f"-chdir={E2E_DIR}", "apply", "-auto-approve"])
+        run(["terraform", f"-chdir={E2E_DIR}", "apply", "-auto-approve"], timeout=600)
 
     topology: dict[str, Any] = json.loads(
         run(["terraform", f"-chdir={E2E_DIR}", "output", "-json", "topology"]).stdout
