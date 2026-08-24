@@ -128,6 +128,7 @@ resource "lxd_network" "segment" {
   type = "bridge"
 
   config = {
+    "dns.mode"                             = "managed"
     "ipv4.address"                         = "${each.value.host_address}/${split("/", each.value.cidr)[1]}"
     "ipv4.nat"                             = "true"
     "ipv6.address"                         = "none"
@@ -187,14 +188,12 @@ resource "lxd_instance" "node" {
         for name in keys(each.value.nics) : name => {
           dhcp4 = true
           dhcp4-overrides = {
-            use-dns     = false
+            use-dns     = !(name == "eth1" && length(each.value.nics) > 1)
             use-domains = false
+            use-routes  = !(name == "eth1" && length(each.value.nics) > 1)
           }
           dhcp6        = false
           "link-local" = []
-          nameservers = {
-            addresses = ["1.1.1.1", "1.0.0.1"]
-          }
         }
       }
     })
