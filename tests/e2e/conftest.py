@@ -565,6 +565,12 @@ def terraform(artifacts: dict[str, SnapArtifact]) -> Generator[TFContext, None, 
         yield TFContext(project=project, topology=topology)
     finally:
         if not KEEP_ENV:
+            images = json.loads(
+                run(["lxc", "--project", project, "image", "list", "--format", "json"]).stdout
+            )
+            for image in images:
+                if not image.get("used_by"):
+                    run(["lxc", "--project", project, "image", "delete", image["fingerprint"]])
             run(["terraform", f"-chdir={E2E_DIR}", "destroy", "-auto-approve"])
 
 
