@@ -1,0 +1,9 @@
+regions:
+  900:
+    regionid: 900
+    regioncode: "one"
+    regionname: "Custom Region One"
+    nodes:
+      - name: "1"
+        regionid: 900
+        hostname: "derper.e2e.test"
