@@ -19,6 +19,7 @@ import yaml
 E2E_DIR = Path(__file__).resolve().parent
 ROOT_DIR = E2E_DIR.parent.parent
 CONFIG_DIR = E2E_DIR / "config"
+HEADSCALE_CONFIG = "/var/snap/headscale/common/config.yaml"
 HOSTS = ("headscale", "derper", "internal-1", "user-1", "user-2")
 TAILSCALE_HOSTS = ("derper", "internal-1", "user-1", "user-2")
 PRODUCTS = {
@@ -311,10 +312,34 @@ def configure_hosts(project: str, topology: dict[str, Any], private_dir: Path) -
         write_remote(project, host, "/etc/hosts", content, private_dir)
 
 
-def configure_services(project: str) -> None:
+def deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge overlay into base, replacing non-dict values."""
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def configure_headscale_config(project: str, private_dir: Path) -> None:
+    """Merge the e2e overrides into the configuration the Headscale snap installed."""
+    installed = lxc_exec(project, "headscale", ["cat", HEADSCALE_CONFIG]).stdout
+    base = yaml.safe_load(installed)
+    if not isinstance(base, dict):
+        raise AssertionError(
+            f"{HEADSCALE_CONFIG} is not a YAML mapping; "
+            "the Headscale snap did not seed its default configuration"
+        )
+    overrides = yaml.safe_load((CONFIG_DIR / "headscale-overrides.yaml").read_text())
+    merged = yaml.safe_dump(deep_merge(base, overrides), sort_keys=False)
+    write_remote(project, "headscale", HEADSCALE_CONFIG, merged, private_dir)
+
+
+def configure_services(project: str, private_dir: Path) -> None:
     lxc_exec(project, "headscale", ["mkdir", "-p", "/var/snap/headscale/common/internal"])
+    configure_headscale_config(project, private_dir)
     for source, destination in (
-        ("headscale.yaml", "/var/snap/headscale/common/config.yaml"),
         ("derp.yaml", "/var/snap/headscale/common/derp.yaml"),
         ("policy.hujson", "/var/snap/headscale/common/policies.hujson"),
     ):
@@ -511,6 +536,10 @@ def get_snap_artifact(snap: str) -> SnapArtifact:
             pytest.fail(f"{snap.upper()}_TEST_SNAP env variable is not set to an absolute path")
         return SnapArtifact(path=path_from_env)
 
+    channel_from_env = os.environ.get(f"{snap.upper()}_TEST_CHANNEL")
+    if channel_from_env:
+        return SnapArtifact(path=snap, channel=channel_from_env)
+
     manifest = yaml.safe_load((ROOT_DIR / "snap/snapcraft.yaml").read_text())
     local_snap_name = manifest.get("name") if isinstance(manifest, dict) else None
     if not isinstance(local_snap_name, str):
@@ -585,7 +614,7 @@ def e2e(
             install_snaps(terraform.project, artifacts)
             configure_certificates(terraform.project, private_dir)
             configure_hosts(terraform.project, terraform.topology, private_dir)
-            configure_services(terraform.project)
+            configure_services(terraform.project, private_dir)
             configure_tailnet(terraform.project, private_dir)
             configure_ssh(terraform.project, private_dir)
         yield E2EContext(
