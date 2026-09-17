@@ -2,7 +2,63 @@ name: End-to-end tests
 
 on:
   workflow_call:
+    inputs:
+      tailscale-channel:
+        description: "Install tailscale from this snap channel instead of building it. Empty = default."
+        type: string
+        required: false
+        default: ""
+      tailscale-branch:
+        description: "Branch of canonical/tailscale-snap to build (a tag or commit SHA also works). Empty = default."
+        type: string
+        required: false
+        default: ""
+      headscale-channel:
+        description: "Install headscale from this snap channel. Empty = latest/edge."
+        type: string
+        required: false
+        default: ""
+      headscale-branch:
+        description: "Branch of canonical/headscale-snap to build (a tag or commit SHA also works). Empty = default."
+        type: string
+        required: false
+        default: ""
+      derper-channel:
+        description: "Install derper from this snap channel. Empty = latest/edge."
+        type: string
+        required: false
+        default: ""
+      derper-branch:
+        description: "Branch of canonical/derper-snap to build (a tag or commit SHA also works). Empty = default."
+        type: string
+        required: false
+        default: ""
   workflow_dispatch:
+    inputs:
+      tailscale-channel:
+        description: "Install tailscale from this snap channel instead of building it. Empty = default."
+        type: string
+        default: ""
+      tailscale-branch:
+        description: "Branch of canonical/tailscale-snap to build (a tag or commit SHA also works). Empty = default."
+        type: string
+        default: ""
+      headscale-channel:
+        description: "Install headscale from this snap channel. Empty = latest/edge."
+        type: string
+        default: ""
+      headscale-branch:
+        description: "Branch of canonical/headscale-snap to build (a tag or commit SHA also works). Empty = default."
+        type: string
+        default: ""
+      derper-channel:
+        description: "Install derper from this snap channel. Empty = latest/edge."
+        type: string
+        default: ""
+      derper-branch:
+        description: "Branch of canonical/derper-snap to build (a tag or commit SHA also works). Empty = default."
+        type: string
+        default: ""
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
@@ -11,7 +67,8 @@ on:
       - "**.rst"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  # Two dispatches of the same ref with different snap sources do not cancel each other
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -46,8 +103,114 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install 'tox<5' uv
 
+      # Fails the run before any snap is built, so a bad dispatch costs seconds.
+      - name: Validate snap source inputs
+        env:
+          TAILSCALE_CHANNEL: ${{ inputs.tailscale-channel }}
+          TAILSCALE_BRANCH: ${{ inputs.tailscale-branch }}
+          HEADSCALE_CHANNEL: ${{ inputs.headscale-channel }}
+          HEADSCALE_BRANCH: ${{ inputs.headscale-branch }}
+          DERPER_CHANNEL: ${{ inputs.derper-channel }}
+          DERPER_BRANCH: ${{ inputs.derper-branch }}
+        run: |
+          set -eu
+          status=0
+          for snap in TAILSCALE HEADSCALE DERPER; do
+            channel_var="${snap}_CHANNEL"
+            branch_var="${snap}_BRANCH"
+            channel="${!channel_var:-}"
+            branch="${!branch_var:-}"
+            if [ -n "$channel" ] && [ -n "$branch" ]; then
+              echo "::error::${snap}: set a channel or a branch, not both"
+              status=1
+            fi
+            # A channel reaches $GITHUB_ENV verbatim, so reject anything that
+            # could smuggle in a second KEY=VALUE line.
+            case "$channel" in
+              *[!a-zA-Z0-9/._-]*)
+                echo "::error::${snap}: channel may only contain letters, digits and / . _ -"
+                status=1
+                ;;
+            esac
+          done
+          exit "$status"
+
       - name: Build snap
+        id: build-tailscale-local
+        if: inputs.tailscale-channel == '' && inputs.tailscale-branch == ''
         uses: canonical/action-build@v1
+
+      - name: Check out tailscale-snap branch
+        if: inputs.tailscale-branch != ''
+        uses: actions/checkout@v6
+        with:
+          repository: canonical/tailscale-snap
+          ref: ${{ inputs.tailscale-branch }}
+          path: .e2e-build/tailscale
+
+      - name: Build tailscale snap from branch
+        id: build-tailscale
+        if: inputs.tailscale-branch != ''
+        uses: canonical/action-build@v1
+        with:
+          path: .e2e-build/tailscale
+
+      - name: Check out headscale-snap branch
+        if: inputs.headscale-branch != ''
+        uses: actions/checkout@v6
+        with:
+          repository: canonical/headscale-snap
+          ref: ${{ inputs.headscale-branch }}
+          path: .e2e-build/headscale
+
+      - name: Build headscale snap from branch
+        id: build-headscale
+        if: inputs.headscale-branch != ''
+        uses: canonical/action-build@v1
+        with:
+          path: .e2e-build/headscale
+
+      - name: Check out derper-snap branch
+        if: inputs.derper-branch != ''
+        uses: actions/checkout@v6
+        with:
+          repository: canonical/derper-snap
+          ref: ${{ inputs.derper-branch }}
+          path: .e2e-build/derper
+
+      - name: Build derper snap from branch
+        id: build-derper
+        if: inputs.derper-branch != ''
+        uses: canonical/action-build@v1
+        with:
+          path: .e2e-build/derper
+
+      - name: Resolve snap sources
+        env:
+          TAILSCALE_PATH: ${{ steps.build-tailscale.outputs.snap }}
+          TAILSCALE_CHANNEL: ${{ inputs.tailscale-channel }}
+          HEADSCALE_PATH: ${{ steps.build-headscale.outputs.snap }}
+          HEADSCALE_CHANNEL: ${{ inputs.headscale-channel }}
+          DERPER_PATH: ${{ steps.build-derper.outputs.snap }}
+          DERPER_CHANNEL: ${{ inputs.derper-channel }}
+        run: |
+          set -eu
+          for snap in TAILSCALE HEADSCALE DERPER; do
+            path_var="${snap}_PATH"
+            channel_var="${snap}_CHANNEL"
+            path="${!path_var:-}"
+            channel="${!channel_var:-}"
+            if [ -n "$path" ]; then
+              # -e so a missing artifact fails here rather than reaching the
+              # suite. Assign separately too: a failing command substitution
+              # inside echo "$(...)" does not trip set -e, and an empty
+              # _TEST_SNAP silently falls back to the default snap source.
+              resolved="$(realpath -e "$path")"
+              echo "${snap}_TEST_SNAP=${resolved}" >> "$GITHUB_ENV"
+            elif [ -n "$channel" ]; then
+              echo "${snap}_TEST_CHANNEL=${channel}" >> "$GITHUB_ENV"
+            fi
+          done
 
       - name: Run end-to-end tests
         run: tox -e e2e
