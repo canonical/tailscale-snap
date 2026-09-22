@@ -36,11 +36,8 @@ jobs:
       - name: Snapcraft promote snap
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_LOGIN }}
-          SNAPCRAFT_HAS_TTY: "true" # this is necessary because snapcraft will not allow --yes for promotions of the edge channel https://github.com/canonical/snapcraft/issues/4439
         run: |
-          # Note: using `yes |` instead of `--yes` because snapcraft will
-          #       refuse to non-interactively promote a snap from the edge
-          #       channel if it is done without any branch qualifiers
-          yes | snapcraft promote ${{ steps.snap.outputs.name }}  \
+          snapcraft promote ${{ steps.snap.outputs.name }}  \
           --from-channel ${{ steps.set-channels.outputs.origin-channel }} \
-          --to-channel ${{ steps.set-channels.outputs.destination-channel }}
+          --to-channel ${{ steps.set-channels.outputs.destination-channel }} \
+          --yes
