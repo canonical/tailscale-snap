@@ -26,6 +26,7 @@ so they must be manually connected:
 sudo snap connect tailscale:firewall-control
 sudo snap connect tailscale:network-control
 sudo snap connect tailscale:sys-devices-virtual-dmi-ids
+sudo snap connect tailscale:tpm
 ```
 
 Once the interfaces are connected,
@@ -41,45 +42,6 @@ Now you can manage tailscale with the `tailscale` command:
 ```
 tailscale status
 ```
-
-## Configuration
-
-### Proxy settings
-
-To configure proxy settings for `tailscaled`, use `snap set`, for example:
-
-```
-sudo snap set tailscale https-proxy=http://proxy.example.com:3128
-sudo snap set tailscale http-proxy=http://proxy.example.com:3128
-sudo snap set tailscale no-proxy=localhost,127.0.0.1
-```
-
-To remove a proxy setting:
-
-```
-sudo snap unset tailscale https-proxy
-```
-
-The service automatically restarts when proxy settings are changed.
-
-### Disable logging to Tailscale
-
-When using a custom coordination server such as [Headscale](https://github.com/juanfont/headscale), you may want to prevent `tailscaled` from sending logs to Tailscale's infrastructure. To do so:
-
-```
-sudo snap set tailscale no-logs-no-support=true
-```
-
-To re-enable:
-
-```
-sudo snap set tailscale no-logs-no-support=false
-# or
-sudo snap unset tailscale no-logs-no-support
-```
-
-> **Note:** Enabling this option disables Tailscale's technical support. [Ref](https://tailscale.com/docs/install/linux#disable-logging).
-
 
 ## Integration with other snaps
 
