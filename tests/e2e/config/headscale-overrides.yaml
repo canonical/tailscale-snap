@@ -1,0 +1,26 @@
+---
+# Deep-merged onto the configuration the Headscale snap installs itself
+# (snap/hooks/install seeds $SNAP_COMMON/config.yaml from its own
+# version-matched default).
+#
+# Keep this minimal. Every key here is a key that can be moved or renamed by an
+# upstream Headscale release.
+server_url: "https://headscale.e2e.test"
+listen_addr: "0.0.0.0:443"
+disable_check_updates: true
+tls_cert_path: "/var/snap/headscale/common/headscale.crt"
+tls_key_path: "/var/snap/headscale/common/headscale.key"
+derp:
+  urls: []
+  paths:
+    - "/var/snap/headscale/common/derp.yaml"
+policy:
+  path: "/var/snap/headscale/common/policies.hujson"
+dns:
+  # Must differ from the server_url domain.
+  base_domain: tailnet.internal
+  # IPv4 only: the LXD networks are created with ipv6.address = none.
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
