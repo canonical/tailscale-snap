@@ -231,9 +231,9 @@ sudo tee /var/snap/headscale/common/policies.hujson <<'EOF'
     // ACL03 internal servers can access each other
     {
       "action": "accept",
-      "src": ["group:internal"],
+      "src": ["tag:internal"],
       "dst": [
-        "group:internal:*",
+        "tag:internal:*",
       ]
     },
     // ACL04 all machines can ping all other machines
@@ -294,29 +294,31 @@ By default, Derper runs as an open relay.
 It does have a `verify-clients` mode though, which uses a locally running Tailscale service to authenticate connections, to restrict use to machines in the same tailnet.
 So here we configure Tailscale on the derper machine to support this.
 
-On derper, install Tailscale and authenticate to the Headscale server using a preauth key with the `derper` user and tag `derper`:
+On derper, install Tailscale and authenticate to the Headscale server using a preauth key with `tag:derper`.
+The key's `--user` records its creator; the node is owned by its tag, not by the `derper` user.
 
 ```bash
 DERPER_USER_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="derper") | .id')"
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID)"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID --tags tag:derper)"
 echo "$KEY"
 
 ssh tailscale-etet-derper -- <<EOF
 set -x
-sudo tailscale up --advertise-tags tag:derper --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
+sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
 tailscale status
 tailscale debug derp-map
 EOF
 
 ```
 
-Verify that the output of `tailscale status` shows an ip address and the `derper` user for the `derper` machine.
+Verify that `tailscale status` shows an IP address for `derper`.
+Tagged nodes appear under the synthetic `tagged-devices` identity in the examples below.
 
 Expected output:
 
 ```text
 + tailscale status
-100.64.0.1      derper               derper       linux   -
+100.64.0.1      derper               tagged-devices  linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -326,33 +328,34 @@ Expected output:
 
 #### Configure Tailscale on machine internal-1
 
-On internal-1, install Tailscale and authenticate to the Headscale server using a preauth key and user `internal` and tag `internal`.
+On internal-1, install Tailscale and authenticate to the Headscale server using a preauth key with `tag:internal`.
+The key records `internal` as its creator; the node is owned by its tag.
 In this environment, this simulates a jumpbox machine within a locked down datacenter (for example), that users such as operators and admins need to access.
 
 ```bash
 INTERNAL_USER_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="internal") | .id')"
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $INTERNAL_USER_ID)"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $INTERNAL_USER_ID --tags tag:internal)"
 echo "$KEY"
 
 ssh tailscale-etet-internal-1 -- <<EOF
 set -x
 sudo snap install --edge tailscale
-sudo tailscale up --advertise-tags tag:internal --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
+sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
 tailscale status
 tailscale debug derp-map
 EOF
 
 ```
 
-Verify that the output of `tailscale status` above shows an ip address and the `internal` user.
+Verify that `tailscale status` shows an IP address for `internal-1` under the `tagged-devices` identity.
 Also verify that the DERP map printed only displays a single entry: the derper server we set up earlier.
 
 Expected output:
 
 ```text
 + tailscale status
-100.64.0.2      internal-1          internal        linux   -
-100.64.0.1      derper               derper       linux   -
+100.64.0.2      internal-1           tagged-devices  linux   -
+100.64.0.1      derper               tagged-devices  linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -380,7 +383,7 @@ EOF
 
 ```
 
-Verify that the output of `tailscale status` above shows an ip address and the `internal` user.
+Verify that the output of `tailscale status` above shows an IP address and the `user1` user for `user-1`.
 Also verify that the DERP map printed only displays a single entry: the derper server we set up earlier.
 
 Expected output:
@@ -388,8 +391,8 @@ Expected output:
 ```text
 + tailscale status
 100.64.0.3      user-1               user1        linux   -
-100.64.0.1      derper               derper       linux   -
-100.64.0.2      internal-1           internal     linux   -
+100.64.0.1      derper               tagged-devices  linux   -
+100.64.0.2      internal-1           tagged-devices  linux   -
 + tailscale debug derp-map
 {
         "Regions": {
@@ -474,8 +477,8 @@ Expected output:
 ```text
 + tailscale status
 100.64.0.4      user-2               user2        linux   -
-100.64.0.1      derper               derper       linux   -
-100.64.0.2      internal-1           internal     linux   -
+100.64.0.1      derper               tagged-devices  linux   -
+100.64.0.2      internal-1           tagged-devices  linux   -
 100.64.0.3      user-1               user1        linux   -
 + tailscale debug derp-map
 {
@@ -595,8 +598,8 @@ It should now show fresh information about the connection to internal-1:
 
 ```text
 100.64.0.2      user-1               user1        linux   -
-100.64.0.4      derper               derper       linux   -
-100.64.0.1      internal-1           internal     linux   active; direct 4.196.101.99:1024, tx 6132 rx 6636
+100.64.0.4      derper               tagged-devices  linux   -
+100.64.0.1      internal-1           tagged-devices  linux   active; direct 4.196.101.99:1024, tx 6132 rx 6636
 100.64.0.3      user-2               user2        linux   -
 ```
 
@@ -674,8 +677,8 @@ The output should show `relay` with the name of the custom DERP server ("one") f
 
 ```bash
 100.64.0.2      user-1               user1        linux   -
-100.64.0.4      derper               derper       linux   -
-100.64.0.1      internal-1           internal     linux   active; relay "one", tx 12824 rx 13768
+100.64.0.4      derper               tagged-devices  linux   -
+100.64.0.1      internal-1           tagged-devices  linux   active; relay "one", tx 12824 rx 13768
 100.64.0.3      user-2               user2        linux   -
 ```
 
@@ -829,12 +832,12 @@ Log tailscale back in on the derper machine:
 
 ```bash
 DERPER_USER_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="derper") | .id')"
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID)"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID --tags tag:derper)"
 echo "$KEY"
 
 ssh tailscale-etet-derper -- <<EOF
 set -x
-sudo tailscale up --advertise-tags tag:derper --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
+sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
 tailscale status
 tailscale debug derp-map
 EOF
@@ -921,13 +924,13 @@ Log tailscale back in on the derper machine:
 
 ```bash
 DERPER_USER_ID="$(ssh tailscale-etet-headscale -- sudo headscale users list -o json | jq -r '.[] | select(.name=="derper") | .id')"
-KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID)"
+KEY="$(ssh tailscale-etet-headscale -- sudo headscale preauthkeys create --user $DERPER_USER_ID --tags tag:derper)"
 echo "$KEY"
 
 ssh tailscale-etet-derper -- <<EOF
 set -x
 sudo snap connect derper:tailscale-socket tailscale:socket
-sudo tailscale up --advertise-tags tag:derper --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
+sudo tailscale up --login-server https://headscale.australiaeast.cloudapp.azure.com --authkey "$KEY"
 tailscale status
 tailscale debug derp-map
 sudo snap set derper verify-clients=true

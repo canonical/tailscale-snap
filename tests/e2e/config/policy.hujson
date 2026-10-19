@@ -21,8 +21,8 @@
     },
     {
       "action": "accept",
-      "src": ["group:internal"],
-      "dst": ["group:internal:*"],
+      "src": ["tag:internal"],
+      "dst": ["tag:internal:*"],
     },
     {
       "action": "accept",
