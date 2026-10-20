@@ -327,7 +327,7 @@ def configure_headscale_config(project: str, private_dir: Path) -> None:
     installed = lxc_exec(project, "headscale", ["cat", HEADSCALE_CONFIG]).stdout
     base = yaml.safe_load(installed)
     if not isinstance(base, dict):
-        raise AssertionError(
+        raise TypeError(
             f"{HEADSCALE_CONFIG} is not a YAML mapping; "
             "the Headscale snap did not seed its default configuration"
         )
@@ -375,7 +375,7 @@ def configure_services(project: str, private_dir: Path) -> None:
     )
 
 
-def preauth_key(project: str, user: str) -> str:
+def preauth_key(project: str, user: str, tag: str | None = None) -> str:
     users = json.loads(
         lxc_exec(project, "headscale", ["headscale", "users", "list", "-o", "json"]).stdout
     )
@@ -387,21 +387,12 @@ def preauth_key(project: str, user: str) -> str:
     except (TypeError, ValueError) as error:
         raise AssertionError(f"Headscale returned an invalid ID for user {user}") from error
 
+    options = f" --tags={tag}" if tag else ""
     payload = json.loads(
-        lxc_exec(
+        shell(
             project,
             "headscale",
-            [
-                "headscale",
-                "preauthkeys",
-                "create",
-                "--user",
-                user_id,
-                "--expiration",
-                "1h",
-                "-o",
-                "json",
-            ],
+            f"headscale preauthkeys create --user={user_id} --expiration=1h -o=json" + options,
         ).stdout
     )
     key = payload.get("key")
@@ -418,17 +409,16 @@ def enroll_with_key(
         project,
         host,
         secret_path,
-        preauth_key(project, user) + "\n",
+        preauth_key(project, user, tag) + "\n",
         private_dir,
         "0600",
     )
-    options = f" --advertise-tags={tag}" if tag else ""
     try:
         shell(
             project,
             host,
             "tailscale up --login-server=https://headscale.e2e.test "
-            ' --authkey="$(cat /run/e2e-authkey)"' + options,
+            ' --authkey="$(cat /run/e2e-authkey)"',
         )
     finally:
         lxc_exec(project, host, ["rm", "-f", secret_path], check=False)
