@@ -1,16 +1,21 @@
 #!/bin/sh -e
 
-# Normalise and validate no-logs-no-support value
-NO_LOGS_NO_SUPPORT="$(snapctl get no-logs-no-support | tr '[:upper:]' '[:lower:]')"
-if [ -n "$NO_LOGS_NO_SUPPORT" ] && [ "$NO_LOGS_NO_SUPPORT" != "true" ] && [ "$NO_LOGS_NO_SUPPORT" != "false" ]; then
-    echo "no-logs-no-support must be 'true' or 'false', got: '${NO_LOGS_NO_SUPPORT}'" >&2
-    exit 1
-fi
+check_boolean() {
+    # Normalise and validate boolean value
+    local value="$(snapctl get "$1" | tr '[:upper:]' '[:lower:]')"
+    if [ -n "$value" ] && [ "$value" != "true" ] && [ "$value" != "false" ]; then
+        echo "$1 must be 'true' or 'false', got: '${value}'" >&2
+        exit 1
+    fi
+    # Write back normalised value if it exists
+    if [ -n "$value" ]; then
+        snapctl set "$1"="$value"
+    fi
+}
 
-# Write back normalised value
-if [ -n "$NO_LOGS_NO_SUPPORT" ]; then
-    snapctl set no-logs-no-support="$NO_LOGS_NO_SUPPORT"
-fi
+check_boolean no-logs-no-support
+check_boolean encrypt-state
+check_boolean hardware-attestation
 
 # Restart tailscaled service to apply new configuration
 if snapctl services tailscale.tailscaled | grep -q "active"; then

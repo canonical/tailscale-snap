@@ -28,11 +28,13 @@ description: |
 
   **Proxy Configuration**
 
-  To route tailscaled traffic through a proxy:
+  Configure tailscaled's proxy settings with:
 
   `sudo snap set tailscale https-proxy=<proxy-url>`
 
-  See https://github.com/canonical/tailscale-snap for more configuration options.
+  `sudo snap set tailscale http-proxy=<proxy-url>`
+
+  `sudo snap set tailscale no-proxy=localhost,127.0.0.1`
 
   **Disable Logging**
 
@@ -41,6 +43,36 @@ description: |
   `sudo snap set tailscale no-logs-no-support=true`
 
   Note: this also disables Tailscale technical support.
+
+  **Node State Storage**
+
+  The node state file is stored at `/var/snap/tailscale/common/tailscaled.state`, whether state encryption is enabled or disabled.
+
+  **TPM-backed State Encryption**
+
+  To encrypt node state at rest using a functioning TPM 2.0 device:
+
+  `sudo snap set tailscale encrypt-state=true`
+
+  Encryption is opt-in. When enabled, tailscaled migrates the existing state file to TPM-sealed storage. If a usable TPM 2.0 is unavailable, enabling encryption prevents tailscaled from starting.
+
+  Disabling encryption migrates the state back to plaintext and requires the original working TPM.
+
+  Encrypted state cannot be restored on a different TPM. A TPM reset or failure may require resetting the node state and registering the device again. See https://tailscale.com/kb/1596/secure-node-state-storage for details and recovery guidance; this snap's state file is at the path above.
+
+  **Hardware Attestation**
+
+  To bind node identity to a functioning TPM 2.0 device using hardware-backed keys:
+
+  `sudo snap set tailscale hardware-attestation=true`
+
+  This passes `--hardware-attestation` to tailscaled. Hardware attestation requires filesystem-backed state, which this snap uses. Its keys are bound to the original TPM and cannot be migrated to another device.
+
+  Hardware attestation does not encrypt the state file by itself. To enable both protections:
+
+  `sudo snap set tailscale hardware-attestation=true encrypt-state=true`
+
+  Disabling attestation omits the daemon flag; it does not make existing TPM-bound keys portable.
 
   **Security**
 
@@ -95,6 +127,7 @@ apps:
       - network-bind
       - network-control
       - sys-devices-virtual-dmi-ids
+      - tpm
 
 parts:
   tailscale:
